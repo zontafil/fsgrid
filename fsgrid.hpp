@@ -36,9 +36,10 @@ template <typename T, int dims, int stencil> class FsGrid {
          // Tell MPI how many Tasks we want in which direction.
          // By giving a value of 0, we let MPI choose this number itself.
          for(int i=0; i<dims; i++) {
-            ntasks[i] = 0;
-            if(ntasks.data()[i] != 0) {
-               std::cerr << "Everything is horrible and all you believe is wrong!" << std::endl;
+            if(globalSize[i] <= 1) {
+               ntasks[i] = 1;
+            } else {
+               ntasks[i] = 0;
             }
          }
          status = MPI_Dims_create(size,dims,ntasks.data());
@@ -140,9 +141,15 @@ template <typename T, int dims, int stencil> class FsGrid {
 
 
          // Determine size of our local grid
+         std::array<int, 3> localStart;
          for(int i=0; i<dims; i++) {
             localSize[i] = calcLocalSize(globalSize[i],ntasks[i], taskPosition[i]);
+            localStart[i] = calcLocalStart(globalSize[i],ntasks[i], taskPosition[i]);
          }
+
+         //std::cerr << "Rank " << rank << " here, my space starts at [" << localStart[0] << ", " << localStart[1] << ", "
+         //   << localStart[2] << "] and ends at [" << (localStart[0] + localSize[0]) << ", " <<
+         //   (localStart[1]+localSize[1]) << ", " << (localStart[2]+localSize[2]) << "]" << std::endl;
 
          // Allocate local storage array
          size_t storageSize=1;
@@ -166,17 +173,39 @@ template <typename T, int dims, int stencil> class FsGrid {
        */
       int getTaskForGlobalID(GlobalID id) {
          // Transform globalID to global cell coordinate
-         std::array<int, dims> globalCell;
+         std::array<int, dims> cell;
 
          int stride=1;
          for(int i=0; i<dims; i++) {
-            globalCell[i] = (id / stride) % globalSize[i];
+            cell[i] = (id / stride) % globalSize[i];
             stride *= globalSize[i];
          }
 
-         // Find the CPU this Cell belongs to
-         // TODO: continue here
-         return 0;
+         // Find the index in the task grid this Cell belongs to
+         std::array<int, dims> taskIndex;
+         for(int i=0; i<dims; i++) {
+            int n_per_task = globalSize[i]/ntasks[i];
+            int remainder = globalSize[i]%ntasks[i];
+
+            if(cell[i] < remainder*(n_per_task+1)) {
+               taskIndex[i] = cell[i] / (n_per_task + 1);
+            } else {
+               taskIndex[i] = remainder + (cell[i] - remainder*(n_per_task+1)) / n_per_task;
+            }
+         }
+
+         int retVal;
+         int status = MPI_Cart_rank(comm3d, taskIndex.data(), &retVal);
+         if(status != MPI_SUCCESS) {
+            std::cerr << "Unable to find FsGrid rank for global ID " << id << " (coordinates [";
+            for(int i=0; i<dims; i++) {
+               std::cerr << cell[i] << ", ";
+            }
+            std::cerr << "]" << std::endl;
+            return MPI_PROC_NULL;
+         }
+
+         return retVal;
       }
       /*! Get the localID (=offset into the data-array) for the given globalID
        * \param id the global cellID of a cell.
