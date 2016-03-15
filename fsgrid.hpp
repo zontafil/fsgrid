@@ -48,6 +48,7 @@ template <typename T, int stencil> class FsGrid {
          //status = MPI_Dims_create(size,fsgrid_dims,ntasks.data());
          computeDomainDecomposition(globalSize, size, ntasks);
 
+
          // Create cartesian communicator
          status = MPI_Cart_create(parent_comm, fsgrid_dims, ntasks.data(), isPeriodic.data(), 0, &comm3d);
          if(status != MPI_SUCCESS) {
@@ -296,22 +297,24 @@ template <typename T, int stencil> class FsGrid {
          std::array<double, 3 > processBox;
          double optimValue = std::numeric_limits<double>::max();
 
+         processDomainDecomposition = {1,1,1};
+
          for(int i = 0; i < 3; i++) {
             systemDim[i] = (double)GlobalSize[i];
          }
 
-         for (int i = 1; i< nProcs; i++) {
+         for (int i = 1; i<= nProcs; i++) {
             if( i  > systemDim[0])
                continue;
             processBox[0] = std::max(systemDim[0]/i, 1.0);
 
-            for (int j = 1; j< nProcs; j++) {
-               if( i * j  >=nProcs || j > systemDim[1])
+            for (int j = 1; j<= nProcs; j++) {
+               if( i * j  >nProcs || j > systemDim[1])
                   continue;
 
                processBox[1] = std::max(systemDim[1]/j, 1.0);
-               for (int k = 1; k< nProcs; k++) {
-                  if( i * j * k >=nProcs || k > systemDim[2])
+               for (int k = 1; k<= nProcs; k++) {
+                  if( i * j * k >nProcs || k > systemDim[2])
                      continue;
                   processBox[2] = std::max(systemDim[2]/k, 1.0);
                   double value = 
