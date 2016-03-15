@@ -18,10 +18,12 @@ int main(int argc, char** argv) {
          for(int i=0; i<8; i++) {
             std::cerr << "Cell ( " << i << ", 0, 0) is located on task "
                << testGrid.getTaskForGlobalID(8*1*0+8*0+i) << std::endl;
+            std::cerr << "   and it has LocalID " << testGrid.getLocalIdForGlobalID(8*1*0+8*0+i) << std::endl;
          }
          for(int i=0; i<8; i++) {
             std::cerr << "Cell ( " << 0 << ", " << i << ", 0) is located on task "
                << testGrid.getTaskForGlobalID(8*1*0+8*i+0) << std::endl;
+            std::cerr << "   and it has LocalID " << testGrid.getLocalIdForGlobalID(8*1*0+8*i+0) << std::endl;
          }
          for(int i=0; i<8; i++) {
             std::cerr << "Cell ( " << i << ", " << i << ", 0) is located on task "

@@ -157,13 +157,18 @@ template <typename T, int stencil> class FsGrid {
          //   (localStart[1]+localSize[1]) << ", " << (localStart[2]+localSize[2]) << "]" << std::endl;
 
          // Allocate local storage array
-         size_t storageSize=1;
-         for(auto i : localSize) {
-            // Size of the local domain + 2* size for the ghost cell stencil
-            storageSize *= (i + stencil*2);
+         size_t totalStorageSize=1;
+         for(int i=0; i<fsgrid_dims; i++) {
+            if(globalSize[i] <= 1) {
+               // Collapsed dimension => only one cell thick
+               storageSize[i] = 1;
+            } else {
+               // Size of the local domain + 2* size for the ghost cell stencil
+               storageSize[i] = (localSize[i] + stencil*2);
+            }
+            totalStorageSize *= storageSize[i];
          }
-         data.resize(storageSize);
-
+         data.resize(totalStorageSize);
       }
 
       /*! Destructor, cleans up the cartesian communicator
@@ -233,11 +238,19 @@ template <typename T, int stencil> class FsGrid {
             thatTasksStart[i] = calcLocalStart(globalSize[i], ntasks[i], taskIndex[i]);
          }
 
-         LocalID result=(localSize[0]+2*stencil)*(localSize[1]+2*stencil)*(cell[0] - thatTasksStart[0])
-            + (localSize[0]+2*stencil)*(cell[1] - thatTasksStart[1])
-            + (cell[0] - thatTasksStart[0]);
+         LocalID result=0;
+         int stride = 1;
+         for(int i=0; i<fsgrid_dims; i++) {
+            if(globalSize[i] <= 1) {
+               // Collapsed dimension, doesn't contribute.
+               result += 0;
+            } else {
+               result += stride*(cell[i] - thatTasksStart[i] + stencil);
+               stride *= storageSize[i];
+            }
+         }
 
-         return 0;
+         return result;
       }
 
       void setFieldData(GlobalID id, T& value);
@@ -251,7 +264,9 @@ template <typename T, int stencil> class FsGrid {
 
       /*! Get the size of the local domain handled by this grid.
        */
-      std::array<int, fsgrid_dims> getLocalSize();
+      std::array<int, fsgrid_dims>& getLocalSize() {
+         return localSize;
+      }
 
       /*! Get a reference to the field data in a cell
        * \param x x-Coordinate, in cells
@@ -267,8 +282,8 @@ template <typename T, int stencil> class FsGrid {
             std::cerr << "Out-of bounds access in FsGrid::get! Expect weirdness." << std::endl;
          }
 
-         int index=(localSize[0]+2*stencil)*(localSize[1]+2*stencil)*z
-            + (localSize[0]+2*stencil)*y
+         int index=storageSize[0]*storageSize[1]*z
+            + storageSize[0]*y
             + x;
 
          return data[index];
@@ -288,7 +303,8 @@ template <typename T, int stencil> class FsGrid {
       std::array<int, fsgrid_dims> taskPosition; //!< This task's position in the 3d task grid
       // 2) Cell numbers in global and local view
       std::array<uint32_t,fsgrid_dims> globalSize; //!< Global size of the simulation space, in cells
-      std::array<uint32_t,fsgrid_dims> localSize;  //!< Local size of simulation space handled by this task
+      std::array<uint32_t,fsgrid_dims> localSize;  //!< Local size of simulation space handled by this task (without ghost cells)
+      std::array<uint32_t,fsgrid_dims> storageSize;  //!< Local size of simulation space handled by this task (including ghost cells)
 
       //! Actual storage of field data
       std::vector<T> data;
