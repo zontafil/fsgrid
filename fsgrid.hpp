@@ -178,13 +178,7 @@ template <typename T, int stencil> class FsGrid {
        */
       int getTaskForGlobalID(GlobalID id) {
          // Transform globalID to global cell coordinate
-         std::array<int, fsgrid_dims> cell;
-
-         int stride=1;
-         for(int i=0; i<fsgrid_dims; i++) {
-            cell[i] = (id / stride) % globalSize[i];
-            stride *= globalSize[i];
-         }
+         std::array<int, fsgrid_dims> cell = globalIDtoCellCoord(id);
 
          // Find the index in the task grid this Cell belongs to
          std::array<int, fsgrid_dims> taskIndex;
@@ -216,6 +210,33 @@ template <typename T, int stencil> class FsGrid {
        * \param id the global cellID of a cell.
        */
       LocalID getLocalIdForGlobalID(GlobalID id) {
+
+         std::array<int, fsgrid_dims> cell = globalIDtoCellCoord(id);
+
+         //TODO: The caller probably just had use calculate this very same value.
+         // Maybe we shouldn't recalculate it.
+         // Find the index in the task grid this Cell belongs to
+         std::array<int, fsgrid_dims> taskIndex;
+         for(int i=0; i<fsgrid_dims; i++) {
+            int n_per_task = globalSize[i]/ntasks[i];
+            int remainder = globalSize[i]%ntasks[i];
+
+            if(cell[i] < remainder*(n_per_task+1)) {
+               taskIndex[i] = cell[i] / (n_per_task + 1);
+            } else {
+               taskIndex[i] = remainder + (cell[i] - remainder*(n_per_task+1)) / n_per_task;
+            }
+         }
+
+         std::array<int, fsgrid_dims> thatTasksStart;
+         for(int i=0; i<fsgrid_dims; i++) {
+            thatTasksStart[i] = calcLocalStart(globalSize[i], ntasks[i], taskIndex[i]);
+         }
+
+         LocalID result=(localSize[0]+2*stencil)*(localSize[1]+2*stencil)*(cell[0] - thatTasksStart[0])
+            + (localSize[0]+2*stencil)*(cell[1] - thatTasksStart[1])
+            + (cell[0] - thatTasksStart[0]);
+
          return 0;
       }
 
