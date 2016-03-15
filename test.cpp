@@ -12,7 +12,7 @@ int main(int argc, char** argv) {
    std::array<uint32_t, 3> globalSize{8,8,1};
    std::array<int, 3> isPeriodic{false,false,true};
    {
-      FsGrid<int,3,1> testGrid(globalSize, MPI_COMM_WORLD, isPeriodic);
+      FsGrid<int,1> testGrid(globalSize, MPI_COMM_WORLD, isPeriodic);
 
       if(rank == 0) {
          for(int i=0; i<8; i++) {

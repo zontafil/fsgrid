@@ -6,15 +6,18 @@
 #include <vector>
 #include <mpi.h>
 #include <iostream>
+#include <limits>
 #include <stdint.h>
+
+static const int fsgrid_dims = 3;
 
 /*! Simple cartesian, non-loadbalancing MPI Grid for use with the fieldsolver
  *
  * \param T datastructure containing the field in each cell which this grid manages
- * \param dims number of dimensions this field has
+ * \param fsgrid_dims number of dimensions this field has
  * \param stencil ghost cell width of this grid
  */
-template <typename T, int dims, int stencil> class FsGrid {
+template <typename T, int stencil> class FsGrid {
 
    public:
 
@@ -26,7 +29,7 @@ template <typename T, int dims, int stencil> class FsGrid {
        * \param MPI_Comm The MPI communicator this grid should use.
        * \param isPeriodic An array specifying, for each dimension, whether it is to be treated as periodic.
        */
-      FsGrid(std::array<uint32_t,dims> globalSize, MPI_Comm parent_comm, std::array<int,dims> isPeriodic)
+      FsGrid(std::array<uint32_t,fsgrid_dims> globalSize, MPI_Comm parent_comm, std::array<int,fsgrid_dims> isPeriodic)
             : globalSize(globalSize) {
 
          int status;
@@ -35,17 +38,18 @@ template <typename T, int dims, int stencil> class FsGrid {
 
          // Tell MPI how many Tasks we want in which direction.
          // By giving a value of 0, we let MPI choose this number itself.
-         for(int i=0; i<dims; i++) {
-            if(globalSize[i] <= 1) {
-               ntasks[i] = 1;
-            } else {
-               ntasks[i] = 0;
-            }
-         }
-         status = MPI_Dims_create(size,dims,ntasks.data());
+         //for(int i=0; i<fsgrid_dims; i++) {
+         //   if(globalSize[i] <= 1) {
+         //      ntasks[i] = 1;
+         //   } else {
+         //      ntasks[i] = 0;
+         //   }
+         //}
+         //status = MPI_Dims_create(size,fsgrid_dims,ntasks.data());
+         computeDomainDecomposition(globalSize, size, ntasks);
 
          // Create cartesian communicator
-         status = MPI_Cart_create(parent_comm, dims, ntasks.data(), isPeriodic.data(), 0, &comm3d);
+         status = MPI_Cart_create(parent_comm, fsgrid_dims, ntasks.data(), isPeriodic.data(), 0, &comm3d);
          if(status != MPI_SUCCESS) {
             std::cerr << "Creating cartesian communicatior failed when attempting to create FsGrid!" << std::endl;
             return;
@@ -63,7 +67,7 @@ template <typename T, int dims, int stencil> class FsGrid {
 
 
          // Determine our position in the resulting task-grid
-         status = MPI_Cart_coords(comm3d, rank, dims, taskPosition.data());
+         status = MPI_Cart_coords(comm3d, rank, fsgrid_dims, taskPosition.data());
          if(status != MPI_SUCCESS) {
             std::cerr << "Rank " << rank
                << " unable to determine own position in cartesian communicator when attempting to create FsGrid!"
@@ -119,7 +123,7 @@ template <typename T, int dims, int stencil> class FsGrid {
                      status = MPI_Cart_rank(comm3d, neighPosition.data(), &neighRank);
                      if(status != MPI_SUCCESS) {
                         std::cerr << "Rank " << rank << " can't determine neighbour rank at position [";
-                        for(int i=0; i<dims; i++) {
+                        for(int i=0; i<fsgrid_dims; i++) {
                            std::cerr << neighPosition[i] << ", ";
                         }
                         std::cerr << "]" << std::endl;
@@ -142,7 +146,7 @@ template <typename T, int dims, int stencil> class FsGrid {
 
          // Determine size of our local grid
          std::array<int, 3> localStart;
-         for(int i=0; i<dims; i++) {
+         for(int i=0; i<fsgrid_dims; i++) {
             localSize[i] = calcLocalSize(globalSize[i],ntasks[i], taskPosition[i]);
             localStart[i] = calcLocalStart(globalSize[i],ntasks[i], taskPosition[i]);
          }
@@ -173,17 +177,17 @@ template <typename T, int dims, int stencil> class FsGrid {
        */
       int getTaskForGlobalID(GlobalID id) {
          // Transform globalID to global cell coordinate
-         std::array<int, dims> cell;
+         std::array<int, fsgrid_dims> cell;
 
          int stride=1;
-         for(int i=0; i<dims; i++) {
+         for(int i=0; i<fsgrid_dims; i++) {
             cell[i] = (id / stride) % globalSize[i];
             stride *= globalSize[i];
          }
 
          // Find the index in the task grid this Cell belongs to
-         std::array<int, dims> taskIndex;
-         for(int i=0; i<dims; i++) {
+         std::array<int, fsgrid_dims> taskIndex;
+         for(int i=0; i<fsgrid_dims; i++) {
             int n_per_task = globalSize[i]/ntasks[i];
             int remainder = globalSize[i]%ntasks[i];
 
@@ -198,7 +202,7 @@ template <typename T, int dims, int stencil> class FsGrid {
          int status = MPI_Cart_rank(comm3d, taskIndex.data(), &retVal);
          if(status != MPI_SUCCESS) {
             std::cerr << "Unable to find FsGrid rank for global ID " << id << " (coordinates [";
-            for(int i=0; i<dims; i++) {
+            for(int i=0; i<fsgrid_dims; i++) {
                std::cerr << cell[i] << ", ";
             }
             std::cerr << "]" << std::endl;
@@ -210,7 +214,9 @@ template <typename T, int dims, int stencil> class FsGrid {
       /*! Get the localID (=offset into the data-array) for the given globalID
        * \param id the global cellID of a cell.
        */
-      LocalID getLocalIdForGlobalID(GlobalID id);
+      LocalID getLocalIdForGlobalID(GlobalID id) {
+         return 0;
+      }
 
       void setFieldData(GlobalID id, T& value);
 
@@ -223,7 +229,7 @@ template <typename T, int dims, int stencil> class FsGrid {
 
       /*! Get the size of the local domain handled by this grid.
        */
-      std::array<int, dims> getLocalSize();
+      std::array<int, fsgrid_dims> getLocalSize();
 
       /*! Get a reference to the field data in a cell
        * \param x x-Coordinate, in cells
@@ -256,14 +262,76 @@ template <typename T, int dims, int stencil> class FsGrid {
 
       // We have, fundamentally, two different coordinate systems we're dealing with:
       // 1) Task grid in the MPI_Cartcomm
-      std::array<int,dims> ntasks; //!< Number of tasks in each direction
-      std::array<int, dims> taskPosition; //!< This task's position in the 3d task grid
+      std::array<int,fsgrid_dims> ntasks; //!< Number of tasks in each direction
+      std::array<int, fsgrid_dims> taskPosition; //!< This task's position in the 3d task grid
       // 2) Cell numbers in global and local view
-      std::array<uint32_t,dims> globalSize; //!< Global size of the simulation space, in cells
-      std::array<uint32_t,dims> localSize;  //!< Local size of simulation space handled by this task
+      std::array<uint32_t,fsgrid_dims> globalSize; //!< Global size of the simulation space, in cells
+      std::array<uint32_t,fsgrid_dims> localSize;  //!< Local size of simulation space handled by this task
 
       //! Actual storage of field data
       std::vector<T> data;
+
+      //! Helper function: given a global cellID, calculate the global cell coordinate from it.
+      // This is then used do determine the task responsible for this cell, and the
+      // local cell index in it.
+      std::array<int, fsgrid_dims> globalIDtoCellCoord(GlobalID id) {
+
+         // Transform globalID to global cell coordinate
+         std::array<int, fsgrid_dims> cell;
+
+         int stride=1;
+         for(int i=0; i<fsgrid_dims; i++) {
+            cell[i] = (id / stride) % globalSize[i];
+            stride *= globalSize[i];
+         }
+
+         return cell;
+      }
+
+      //! Helper function to optimize decomposition of this grid over the given number of tasks
+      void computeDomainDecomposition(const std::array<uint32_t, 3>& GlobalSize, int nProcs, 
+            std::array<int,3>& processDomainDecomposition) {
+
+         std::array<double, 3> systemDim;
+         std::array<double, 3 > processBox;
+         double optimValue = std::numeric_limits<double>::max();
+
+         for(int i = 0; i < 3; i++) {
+            systemDim[i] = (double)GlobalSize[i];
+         }
+
+         for (int i = 1; i< nProcs; i++) {
+            if( i  > systemDim[0])
+               continue;
+            processBox[0] = std::max(systemDim[0]/i, 1.0);
+
+            for (int j = 1; j< nProcs; j++) {
+               if( i * j  >=nProcs || j > systemDim[1])
+                  continue;
+
+               processBox[1] = std::max(systemDim[1]/j, 1.0);
+               for (int k = 1; k< nProcs; k++) {
+                  if( i * j * k >=nProcs || k > systemDim[2])
+                     continue;
+                  processBox[2] = std::max(systemDim[2]/k, 1.0);
+                  double value = 
+                     100 * processBox[0] * processBox[1] * processBox[2] + 
+                     (i > 1 ? processBox[1] * processBox[2]: 0) +
+                     (j > 1 ? processBox[0] * processBox[2]: 0) +
+                     (k > 1 ? processBox[0] * processBox[1]: 0);
+
+                  if(value < optimValue ){
+                     optimValue = value;
+                     processDomainDecomposition[0] = i;
+                     processDomainDecomposition[1] = j;
+                     processDomainDecomposition[2] = k;
+
+                  }
+               }
+            }
+         }
+      }
+
 
       //! Helper function: calculate position of the local coordinate space for the given dimension
       //TODO: Inverse of these, to get task for a given position
