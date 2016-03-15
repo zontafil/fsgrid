@@ -52,6 +52,7 @@ public:
 
       // Allocate local storage array
 
+
    }
 
    ~FsGrid() {
@@ -68,6 +69,11 @@ public:
     * Perform ghost cell communication.
     */
    void updateGhostCells();
+
+   /**
+    * Get number of cells handeled by the local task in each spatial dimension.
+    */
+   std::array<int, dims> getLocalSize();
 
    /**
     * Get a reference to the field data in a cell
