@@ -29,7 +29,7 @@ template <typename T, int stencil> class FsGrid {
        * \param MPI_Comm The MPI communicator this grid should use.
        * \param isPeriodic An array specifying, for each dimension, whether it is to be treated as periodic.
        */
-      FsGrid(std::array<uint32_t,fsgrid_dims> globalSize, MPI_Comm parent_comm, std::array<int,fsgrid_dims> isPeriodic)
+      FsGrid(std::array<int32_t,fsgrid_dims> globalSize, MPI_Comm parent_comm, std::array<int,fsgrid_dims> isPeriodic)
             : globalSize(globalSize) {
 
          int status;
@@ -168,11 +168,88 @@ template <typename T, int stencil> class FsGrid {
             totalStorageSize *= storageSize[i];
          }
          data.resize(totalStorageSize);
+
+         MPI_Datatype mpiTypeT;
+         MPI_Type_contiguous(sizeof(T), MPI_CHAR, &mpiTypeT);
+         
+         
+         // Compute send and receive datatypes
+         for(int x=-1; x<=1;x++) {
+            for(int y=-1; y<=1;y++) {
+               for(int z=-1; z<=1; z++) {
+                  std::array<int,3> subarraySize;
+                  std::array<int,3> subarrayStart;
+                  
+                  subarraySize[0] = (x==0) ? localSize[0] : stencil;
+                  subarraySize[1] = (y==0) ? localSize[1] : stencil;
+                  subarraySize[2] = (z==0) ? localSize[2] : stencil;
+
+                  if( x == 0 || x == -1 )
+                     subarrayStart[0] = stencil;
+                  else if (x == 1)
+                     subarrayStart[0] = storageSize[0] - 2 * stencil;
+                  if( y == 0 || y == -1 )
+                     subarrayStart[1] = stencil;
+                  else if (y == 1)
+                     subarrayStart[1] = storageSize[1] - 2 * stencil;
+                  if( z == 0 || z == -1 )
+                     subarrayStart[2] = stencil;
+                  else if (z == 1)
+                     subarrayStart[2] = storageSize[2] - 2 * stencil;
+                  
+                  MPI_Type_create_subarray(3,
+                                           storageSize.data(),
+                                           subarraySize.data(),
+                                           subarrayStart.data(),
+                                           MPI_ORDER_C,
+                                           mpiTypeT,
+                                           &(neighbourSendType[(x+1) * 9 + (y + 1) * 3 + (z + 1)]) );
+                  
+                  if(x == -1 )
+                     subarrayStart[0] = 0;
+                  else if (x == 0)
+                     subarrayStart[0] = stencil;
+                  else if (x == 1)
+                     subarrayStart[0] = storageSize[0] -  stencil;
+                  if(y == -1 )
+                     subarrayStart[1] = 0;
+                  else if (y == 0)
+                     subarrayStart[1] = stencil;
+                  else if (y == 1)
+                     subarrayStart[1] = storageSize[1] -  stencil;
+                  if(z == -1 )
+                     subarrayStart[2] = 0;
+                  else if (z == 0)
+                     subarrayStart[2] = stencil;
+                  else if (z == 1)
+                     subarrayStart[2] = storageSize[2] -  stencil;
+                
+                  MPI_Type_create_subarray(3,
+                                           storageSize.data(),
+                                           subarraySize.data(),
+                                           subarrayStart.data(),
+                                           MPI_ORDER_C,
+                                           mpiTypeT,
+                                           &(neighbourReceiveType[(x+1)*9+(y+1)*3+(z+1)]) );
+                  
+               }
+            }
+         }
+         
+         for(int i=0;i<27;i++){
+            MPI_Type_commit(&(neighbourReceiveType[i]));
+            MPI_Type_commit(&(neighbourSendType[i]));
+         }
       }
 
       /*! Destructor, cleans up the cartesian communicator
        */
       ~FsGrid() {
+         
+         for(int i=0;i<27;i++){
+            MPI_Type_free(&(neighbourReceiveType[i]));
+            MPI_Type_free(&(neighbourSendType[i]));
+         }
          MPI_Comm_free(&comm3d);
       }
 
@@ -303,9 +380,13 @@ template <typename T, int stencil> class FsGrid {
       std::array<int,fsgrid_dims> ntasks; //!< Number of tasks in each direction
       std::array<int, fsgrid_dims> taskPosition; //!< This task's position in the 3d task grid
       // 2) Cell numbers in global and local view
-      std::array<uint32_t,fsgrid_dims> globalSize; //!< Global size of the simulation space, in cells
-      std::array<uint32_t,fsgrid_dims> localSize;  //!< Local size of simulation space handled by this task (without ghost cells)
-      std::array<uint32_t,fsgrid_dims> storageSize;  //!< Local size of simulation space handled by this task (including ghost cells)
+      std::array<int32_t,fsgrid_dims> globalSize; //!< Global size of the simulation space, in cells
+      std::array<int32_t,fsgrid_dims> localSize;  //!< Local size of simulation space handled by this task (without ghost cells)
+      std::array<int32_t,fsgrid_dims> storageSize;  //!< Local size of simulation space handled by this task (including ghost cells)
+
+      std::array<MPI_Datatype, 27> neighbourSendType; //!< Datatype for sending data
+      std::array<MPI_Datatype, 27> neighbourReceiveType; //!< Datatype for receiving data
+
 
       //! Actual storage of field data
       std::vector<T> data;
@@ -328,7 +409,7 @@ template <typename T, int stencil> class FsGrid {
       }
 
       //! Helper function to optimize decomposition of this grid over the given number of tasks
-      void computeDomainDecomposition(const std::array<uint32_t, 3>& GlobalSize, int nProcs, 
+      void computeDomainDecomposition(const std::array<int32_t, 3>& GlobalSize, int nProcs, 
             std::array<int,3>& processDomainDecomposition) {
 
          std::array<double, 3> systemDim;
@@ -380,7 +461,7 @@ template <typename T, int stencil> class FsGrid {
       // \param ntasks Total number of tasks in this dimension
       // \param my_n This task's position in this dimension
       // \return Cell number at which this task's domains cells start (actual cells, not counting ghost cells)
-      uint32_t calcLocalStart(uint32_t globalCells, int ntasks, int my_n) {
+      int32_t calcLocalStart(int32_t globalCells, int ntasks, int my_n) {
          int n_per_task = globalCells / ntasks;
          int remainder = globalCells % ntasks;
 
@@ -396,7 +477,7 @@ template <typename T, int stencil> class FsGrid {
       // \param ntasks Total number of tasks in this dimension
       // \param my_n This task's position in this dimension
       // \return Nmuber of cells for this task's local domain (actual cells, not counting ghost cells)
-      uint32_t calcLocalSize(uint32_t globalCells, int ntasks, int my_n) {
+      int32_t calcLocalSize(int32_t globalCells, int ntasks, int my_n) {
          int n_per_task = globalCells/ntasks;
          int remainder = globalCells%ntasks;
          if(my_n < remainder) {
