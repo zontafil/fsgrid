@@ -253,13 +253,11 @@ template <typename T, int stencil> class FsGrid {
        *
        * \param cellsToSend How many cells are going to be sent by this task
        */
-      void setupForTransfer(int cellsToSend) {
+      void setupForTransferIn(int cellsToSend) {
          int status;
          // Make sure we have sufficient buffer space to store our mpi requests
-         recvRequests.resize(localSize[0]*localSize[1]*localSize[2]);
-         numRecvRequests=0;
-         sendRequests.resize(cellsToSend);
-         numSendRequests=0;
+         requests.resize(localSize[0]*localSize[1]*localSize[2] + cellsToSend);
+         numRequests=0;
 
          for(int z=0; z<localSize[2]; z++) {
             for(int y=0; y<localSize[1]; y++) {
@@ -267,8 +265,10 @@ template <typename T, int stencil> class FsGrid {
                   // Calculate LocalID for this cell
                   LocalID thisCell = LocalIDForCoords(x,y,z);
                   status = MPI_Irecv(&get(thisCell), sizeof(T), MPI_BYTE, MPI_ANY_SOURCE, thisCell, comm3d,
-                        recvRequests[numRecvRequests++]);
-                  //TODO: Error checking?
+                        &requests[numRequests++]);
+                  if(status != MPI_SUCCESS) {
+                     std::cerr << "Error setting up MPI Irecv in FsGrid::setupForTransferIn" << std::endl;
+                  }
                }
             }
          }
@@ -289,8 +289,18 @@ template <typename T, int stencil> class FsGrid {
          // Build the MPI Isend request for this cell
          int status;
          status = MPI_Isend(&value, sizeof(T), MPI_BYTE, TaskLid.first, TaskLid.second, comm3d,
-               sendRequests[numSendRequests++]);
-         //TODO: Error checking?
+               &requests[numRequests++]);
+         if(status != MPI_SUCCESS) {
+            std::cerr << "Error setting up MPI Isend in FsGrid::setFieldData" << std::endl;
+         }
+      }
+
+      /*! Called after setting up the transfers into or out of this grid.
+       * Basically only does a MPI_Waitall for all requests.
+       */
+      void finishTransfers() {
+         // TODO: Don't ignore statuses?
+         MPI_Waitall(numRequests,requests.data(),MPI_STATUSES_IGNORE);
       }
 
       /*! Perform ghost cell communication.
@@ -302,7 +312,7 @@ template <typename T, int stencil> class FsGrid {
 
       /*! Get the size of the local domain handled by this grid.
        */
-      std::array<int, 3>& getLocalSize() {
+      std::array<uint32_t, 3>& getLocalSize() {
          return localSize;
       }
 
@@ -327,7 +337,7 @@ template <typename T, int stencil> class FsGrid {
       //const T& get(int x, int y, int z) const;
 
       T& get(LocalID id) {
-         if(id < 0 || id > data.get_size()) {
+         if(id < 0 || id > data.size()) {
             std::cerr << "Out-of-bounds access in FsGrid::get! Expect weirdness." << std::endl;
          }
          return data[id];
@@ -337,9 +347,8 @@ template <typename T, int stencil> class FsGrid {
       //! MPI Cartesian communicator used in this grid
       MPI_Comm comm3d;
       int rank; //!< This task's rank in the communicator
-      std::vector<MPI_Request*> sendRequests;
-      std::vector<MPI_Request*> recvRequests;
-      int numSendRequests, numRecvRequests;
+      std::vector<MPI_Request> requests;
+      int numRequests;
 
       std::array<int, 27> neighbour; //!< IDs of the 26 neighbours (plus ourselves)
       std::vector<char> neighbour_index; //!< Lookup table from rank to index in the neighbour array
