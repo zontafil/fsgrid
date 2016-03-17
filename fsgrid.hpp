@@ -170,9 +170,7 @@ template <typename T, int stencil> class FsGrid {
          data.resize(totalStorageSize);
 
          MPI_Datatype mpiTypeT;
-         MPI_Type_contiguous(sizeof(T), MPI_CHAR, &mpiTypeT);
-         
-         
+         MPI_Type_contiguous(sizeof(T), MPI_BYTE, &mpiTypeT);
          // Compute send and receive datatypes
          for(int x=-1; x<=1;x++) {
             for(int y=-1; y<=1;y++) {
@@ -180,9 +178,18 @@ template <typename T, int stencil> class FsGrid {
                   std::array<int,3> subarraySize;
                   std::array<int,3> subarrayStart;
                   
-                  subarraySize[0] = (x==0) ? localSize[0] : stencil;
-                  subarraySize[1] = (y==0) ? localSize[1] : stencil;
-                  subarraySize[2] = (z==0) ? localSize[2] : stencil;
+                  if((storageSize[0] == 1 && x!= 0 ) ||
+                     (storageSize[1] == 1 && y!= 0 ) ||
+                     (storageSize[2] == 1 && z!= 0 )){
+                     //check for 2 or 1D simulations
+                     neighbourSendType[(x+1) * 9 + (y + 1) * 3 + (z + 1)] = MPI_DATATYPE_NULL;
+                     neighbourReceiveType[(x+1) * 9 + (y + 1) * 3 + (z + 1)] = MPI_DATATYPE_NULL;
+                     continue;
+                  }
+
+                  subarraySize[0] = (x == 0) ? localSize[0] : stencil;
+                  subarraySize[1] = (y == 0) ? localSize[1] : stencil;
+                  subarraySize[2] = (z == 0) ? localSize[2] : stencil;
 
                   if( x == 0 || x == -1 )
                      subarrayStart[0] = stencil;
@@ -197,6 +204,17 @@ template <typename T, int stencil> class FsGrid {
                   else if (z == 1)
                      subarrayStart[2] = storageSize[2] - 2 * stencil;
                   
+                  for(int i = 0;i < 3; i++)
+                     if(storageSize[i] == 1) 
+                        subarrayStart[i] = 0;
+                  /*
+                  printf("create datatype for %d, %d, %d:\n %d %d %d\n %d %d %d\n %d %d %d\n", 
+                         x, y, z,
+                         storageSize[0], storageSize[1], storageSize[2], 
+                         subarraySize[0], subarraySize[1], subarraySize[2], 
+                         subarrayStart[0], subarrayStart[1], subarrayStart[2]);
+                  */
+                         
                   MPI_Type_create_subarray(3,
                                            storageSize.data(),
                                            subarraySize.data(),
@@ -223,7 +241,10 @@ template <typename T, int stencil> class FsGrid {
                      subarrayStart[2] = stencil;
                   else if (z == 1)
                      subarrayStart[2] = storageSize[2] -  stencil;
-                
+                  for(int i = 0;i < 3; i++)
+                     if(storageSize[i] == 1) 
+                        subarrayStart[i] = 0;
+                  
                   MPI_Type_create_subarray(3,
                                            storageSize.data(),
                                            subarraySize.data(),
@@ -237,18 +258,21 @@ template <typename T, int stencil> class FsGrid {
          }
          
          for(int i=0;i<27;i++){
-            MPI_Type_commit(&(neighbourReceiveType[i]));
-            MPI_Type_commit(&(neighbourSendType[i]));
+            if(neighbourReceiveType[i] != MPI_DATATYPE_NULL)
+               MPI_Type_commit(&(neighbourReceiveType[i]));
+            if(neighbourSendType[i] != MPI_DATATYPE_NULL)
+               MPI_Type_commit(&(neighbourSendType[i]));
          }
       }
 
       /*! Destructor, cleans up the cartesian communicator
        */
       ~FsGrid() {
-         
          for(int i=0;i<27;i++){
-            MPI_Type_free(&(neighbourReceiveType[i]));
-            MPI_Type_free(&(neighbourSendType[i]));
+            if(neighbourReceiveType[i] != MPI_DATATYPE_NULL)
+               MPI_Type_free(&(neighbourReceiveType[i]));
+            if(neighbourSendType[i] != MPI_DATATYPE_NULL)
+               MPI_Type_free(&(neighbourSendType[i]));
          }
          MPI_Comm_free(&comm3d);
       }
