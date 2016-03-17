@@ -158,20 +158,40 @@ template <typename T, int stencil> class FsGrid {
 
          MPI_Datatype mpiTypeT;
          MPI_Type_contiguous(sizeof(T), MPI_BYTE, &mpiTypeT);
-         // Compute send and receive datatypes
          for(int x=-1; x<=1;x++) {
             for(int y=-1; y<=1;y++) {
                for(int z=-1; z<=1; z++) {
+                  neighbourSendType[(x+1) * 9 + (y + 1) * 3 + (z + 1)] = MPI_DATATYPE_NULL;
+                  neighbourReceiveType[(x+1) * 9 + (y + 1) * 3 + (z + 1)] = MPI_DATATYPE_NULL;
+               }
+            }
+         }
+         
+         // Compute send and receive datatypes
+/*         int x=-1;
+         int y=0;
+         int z=0;
+*/       
+         
+         
+
+         for(int x=-1; x<=1;x++) {
+            for(int y=-1; y<=1;y++) {
+               for(int z=-1; z<=1; z++) {
+
                   std::array<int,3> subarraySize;
                   std::array<int,3> subarrayStart;
+                  
+                  std::array<int,3> sSize = storageSize;
+                     
                   
                   if((storageSize[0] == 1 && x!= 0 ) ||
                      (storageSize[1] == 1 && y!= 0 ) ||
                      (storageSize[2] == 1 && z!= 0 )){
                      //check for 2 or 1D simulations
-                     neighbourSendType[(x+1) * 9 + (y + 1) * 3 + (z + 1)] = MPI_BYTE;
-                     neighbourReceiveType[(x+1) * 9 + (y + 1) * 3 + (z + 1)] = MPI_BYTE;
-                     continue;
+                     neighbourSendType[(x+1) * 9 + (y + 1) * 3 + (z + 1)] = MPI_DATATYPE_NULL;
+                     neighbourReceiveType[(x+1) * 9 + (y + 1) * 3 + (z + 1)] = MPI_DATATYPE_NULL;
+                     //continue;
                   }
 
                   subarraySize[0] = (x == 0) ? localSize[0] : stencil;
@@ -201,36 +221,42 @@ template <typename T, int stencil> class FsGrid {
                             subarraySize[0], subarraySize[1], subarraySize[2], 
                             subarrayStart[0], subarrayStart[1], subarrayStart[2]);
                   
-                         
+                  int a;
+                  /*
+                  a=sSize[0];sSize[0]=sSize[2];sSize[2]=a;
+                  a=subarraySize[0];subarraySize[0]=subarraySize[2];subarraySize[2]=a;
+                  a=subarrayStart[0];subarrayStart[0]=subarrayStart[2];subarrayStart[2]=a;
+                  */
                   MPI_Type_create_subarray(3,
-                                           storageSize.data(),
+                                           sSize.data(),
                                            subarraySize.data(),
                                            subarrayStart.data(),
                                            MPI_ORDER_C,
                                            mpiTypeT,
                                            &(neighbourSendType[(x+1) * 9 + (y + 1) * 3 + (z + 1)]) );
                   
-                  if(x == -1 )
+                  if(x == 1 )
                      subarrayStart[0] = 0;
                   else if (x == 0)
                      subarrayStart[0] = stencil;
-                  else if (x == 1)
+                  else if (x == -1)
                      subarrayStart[0] = storageSize[0] -  stencil;
-                  if(y == -1 )
+                  if(y == 1 )
                      subarrayStart[1] = 0;
                   else if (y == 0)
                      subarrayStart[1] = stencil;
-                  else if (y == 1)
+                  else if (y == -1)
                      subarrayStart[1] = storageSize[1] -  stencil;
-                  if(z == -1 )
+                  if(z == 1 )
                      subarrayStart[2] = 0;
                   else if (z == 0)
                      subarrayStart[2] = stencil;
-                  else if (z == 1)
+                  else if (z == -1)
                      subarrayStart[2] = storageSize[2] -  stencil;
                   for(int i = 0;i < 3; i++)
                      if(storageSize[i] == 1) 
                         subarrayStart[i] = 0;
+
                   if(rank==0)
                      printf("create rcv datatype for %d, %d, %d:  storagesize %d %d %d subarraysize  %d %d %d subarraystart %d %d %d\n", 
                             x, y, z,
@@ -238,9 +264,9 @@ template <typename T, int stencil> class FsGrid {
                             subarraySize[0], subarraySize[1], subarraySize[2], 
                             subarrayStart[0], subarrayStart[1], subarrayStart[2]);
                   
-                  
+                  // a=subarrayStart[0];subarrayStart[0]=subarrayStart[2];subarrayStart[2]=a;                  
                   MPI_Type_create_subarray(3,
-                                           storageSize.data(),
+                                           sSize.data(),
                                            subarraySize.data(),
                                            subarrayStart.data(),
                                            MPI_ORDER_C,
@@ -250,11 +276,11 @@ template <typename T, int stencil> class FsGrid {
                }
             }
          }
-         
+
          for(int i=0;i<27;i++){
-            if(neighbourReceiveType[i] != MPI_BYTE)
+            if(neighbourReceiveType[i] != MPI_DATATYPE_NULL)
                MPI_Type_commit(&(neighbourReceiveType[i]));
-            if(neighbourSendType[i] != MPI_BYTE)
+            if(neighbourSendType[i] != MPI_DATATYPE_NULL)
                MPI_Type_commit(&(neighbourSendType[i]));
          }
          
@@ -272,9 +298,9 @@ template <typename T, int stencil> class FsGrid {
        */
       ~FsGrid() {
          for(int i=0;i<27;i++){
-            if(neighbourReceiveType[i] != MPI_BYTE)
+            if(neighbourReceiveType[i] != MPI_DATATYPE_NULL)
                MPI_Type_free(&(neighbourReceiveType[i]));
-            if(neighbourSendType[i] != MPI_BYTE)
+            if(neighbourSendType[i] != MPI_DATATYPE_NULL)
                MPI_Type_free(&(neighbourSendType[i]));
          }
          MPI_Comm_free(&comm3d);
@@ -419,7 +445,7 @@ template <typename T, int stencil> class FsGrid {
        * Basically only does a MPI_Waitall for all requests.
        */
       void finishGridCoupling() {
-         MPI_Waitall(numRequests,requests.data(),MPI_STATUSES_IGNORE);
+         MPI_Waitall(numRequests, requests.data(), MPI_STATUSES_IGNORE);
       }
 
       /*! Prepare for transfer of grid cell data into this grid. 
@@ -533,6 +559,14 @@ template <typename T, int stencil> class FsGrid {
        */
       void updateGhostCells() {
          //TODO, faster with simultaneous isends& ireceives?
+         std::array<MPI_Request, 27> receiveRequests;
+         std::array<MPI_Request, 27> sendRequests;
+         
+         for(int i = 0; i < 27;i++){
+            sendRequests[i] = MPI_REQUEST_NULL;
+            receiveRequests[i] = MPI_REQUEST_NULL;
+         }
+         
          
          for(int x=-1; x<=1;x++) {
             for(int y=-1; y<=1;y++) {
@@ -541,22 +575,30 @@ template <typename T, int stencil> class FsGrid {
                   std::array<int,3> subarrayStart;
                   int receiveId = (1 - x) * 9 + ( 1 - y) * 3 + ( 1 - z);
                   int sendId = (x+1) * 9 + (y + 1) * 3 + (z + 1);
-/*                  if(neighbour[i] != MPI_PROC_NULL &&
-                    neighbourSendType[i] != MPI_DATATYPE_NULL &&
-                    neighbourReceiveType[i] != MPI_DATATYPE_NULL) {
-*/
-                  printf("%d: Send to %d %d %d ( %d) with rank %d\n", rank, x, y, z, sendId, neighbour[sendId]);
-                  printf("%d: Receive from %d %d %d ( %d) with rank %d\n", rank, -x, -y, -z, receiveId, neighbour[receiveId]);
+                  int shiftId = sendId;
                   
-                  MPI_Sendrecv(data.data(), 1, neighbourSendType[sendId], neighbour[sendId], sendId, 
-                               data.data(), 1, neighbourReceiveType[receiveId], neighbour[receiveId], sendId,
-                               comm3d, MPI_STATUS_IGNORE);
-                  printf("%d: ... done\n",rank);
+
+                  if(neighbour[sendId] != MPI_PROC_NULL &&
+                     neighbourSendType[sendId] != MPI_DATATYPE_NULL) {
+                     printf("%d: Send to %d %d %d (shift  %d) with rank %d\n", rank, x, y, z, shiftId, neighbour[sendId]);                     
+                     MPI_Isend(data.data(), 1, neighbourSendType[shiftId], neighbour[sendId], shiftId, comm3d, &(sendRequests[shiftId]));
+                  }
+
+                  if(neighbour[receiveId] != MPI_PROC_NULL &&
+                     neighbourSendType[shiftId] != MPI_DATATYPE_NULL) {
+                     printf("%d: Receive from %d %d %d (shift %d) with rank %d\n", rank, -x, -y, -z, shiftId, neighbour[receiveId]);
+                     MPI_Irecv(data.data(), 1, neighbourSendType[shiftId], neighbour[receiveId], shiftId, comm3d, &(receiveRequests[shiftId]));
+                  }
+                  
                }
             }
          }
+         MPI_Waitall(27, sendRequests.data(), MPI_STATUSES_IGNORE);
+         MPI_Waitall(27, receiveRequests.data(), MPI_STATUSES_IGNORE);
+         
       }
-
+   
+   
    
 
       /*! Get the size of the local domain handled by this grid.

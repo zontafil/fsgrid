@@ -10,7 +10,7 @@ int main(int argc, char** argv) {
    MPI_Comm_size(MPI_COMM_WORLD, &size);
 
    // Create a 8×8 Testgrid
-   std::array<int32_t, 3> globalSize{20,8,1};
+   std::array<int32_t, 3> globalSize{9,2,1};
    std::array<int, 3> isPeriodic{true,true,true};
    {
       FsGrid<int,1> testGrid(globalSize, MPI_COMM_WORLD, isPeriodic);
