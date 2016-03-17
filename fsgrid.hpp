@@ -168,26 +168,22 @@ template <typename T, int stencil> class FsGrid {
          }
          
          // Compute send and receive datatypes
-/*         int x=-1;
-         int y=0;
-         int z=0;
-*/       
-         
-         
 
+         //loop through the shifts in the different directions
          for(int x=-1; x<=1;x++) {
             for(int y=-1; y<=1;y++) {
                for(int z=-1; z<=1; z++) {
-
                   std::array<int,3> subarraySize;
                   std::array<int,3> subarrayStart;                  
-
+                  const int shiftId = (x+1) * 9 + (y + 1) * 3 + (z + 1);
+                  
+                  
                   if((storageSize[0] == 1 && x!= 0 ) ||
                      (storageSize[1] == 1 && y!= 0 ) ||
                      (storageSize[2] == 1 && z!= 0 )){
                      //check for 2 or 1D simulations
-                     neighbourSendType[(x+1) * 9 + (y + 1) * 3 + (z + 1)] = MPI_DATATYPE_NULL;
-                     neighbourReceiveType[(x+1) * 9 + (y + 1) * 3 + (z + 1)] = MPI_DATATYPE_NULL;
+                     neighbourSendType[shiftId] = MPI_DATATYPE_NULL;
+                     neighbourReceiveType[shiftId] = MPI_DATATYPE_NULL;
                      continue;
                   }
 
@@ -222,7 +218,7 @@ template <typename T, int stencil> class FsGrid {
                                            subarrayStart.data(),
                                            MPI_ORDER_C,
                                            mpiTypeT,
-                                           &(neighbourSendType[(x+1) * 9 + (y + 1) * 3 + (z + 1)]) );
+                                           &(neighbourSendType[shiftId]) );
                   
                   if(x == 1 )
                      subarrayStart[0] = 0;
@@ -253,7 +249,7 @@ template <typename T, int stencil> class FsGrid {
                                            subarrayStart.data(),
                                            MPI_ORDER_C,
                                            mpiTypeT,
-                                           &(neighbourReceiveType[(x+1)*9+(y+1)*3+(z+1)]) );
+                                           &(neighbourReceiveType[shiftId]));
                   
                }
             }
@@ -553,25 +549,18 @@ template <typename T, int stencil> class FsGrid {
          for(int x=-1; x<=1;x++) {
             for(int y=-1; y<=1;y++) {
                for(int z=-1; z<=1; z++) {
-                  std::array<int,3> subarraySize;
-                  std::array<int,3> subarrayStart;
                   int receiveId = (1 - x) * 9 + ( 1 - y) * 3 + ( 1 - z);
                   int sendId = (x+1) * 9 + (y + 1) * 3 + (z + 1);
                   int shiftId = sendId;
-                  
-
                   if(neighbour[sendId] != MPI_PROC_NULL &&
                      neighbourSendType[sendId] != MPI_DATATYPE_NULL) {
-//                     printf("%d: Send to %d %d %d (shift  %d) with rank %d\n", rank, x, y, z, shiftId, neighbour[sendId]);                     
                      MPI_Isend(data.data(), 1, neighbourSendType[shiftId], neighbour[sendId], shiftId, comm3d, &(sendRequests[shiftId]));
                   }
-
+                  
                   if(neighbour[receiveId] != MPI_PROC_NULL &&
                      neighbourSendType[shiftId] != MPI_DATATYPE_NULL) {
-//                     printf("%d: Receive from %d %d %d (shift %d) with rank %d\n", rank, -x, -y, -z, shiftId, neighbour[receiveId]);
                      MPI_Irecv(data.data(), 1, neighbourReceiveType[shiftId], neighbour[receiveId], shiftId, comm3d, &(receiveRequests[shiftId]));
                   }
-                  
                }
             }
          }
