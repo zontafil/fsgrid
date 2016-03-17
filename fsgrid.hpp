@@ -56,7 +56,6 @@ template <typename T, int stencil> class FsGrid {
             return;
          }
 
-         int rank;
          status = MPI_Comm_rank(comm3d, &rank);
          if(status != MPI_SUCCESS) {
             std::cerr << "Getting rank failed when attempting to create FsGrid!" << std::endl;
@@ -177,11 +176,11 @@ template <typename T, int stencil> class FsGrid {
          MPI_Comm_free(&comm3d);
       }
 
-      /*! Returns the task responsible for handling the cell with the given GlobalID
+      /*! Returns the task responsible, and its localID for handling the cell with the given GlobalID
        * \param id GlobalID of the cell for which task is to be determined
        * \return a task for the grid's cartesian communicator
        */
-      int getTaskForGlobalID(GlobalID id) {
+      std::pair<int,LocalID> getTaskForGlobalID(GlobalID id) {
          // Transform globalID to global cell coordinate
          std::array<int, fsgrid_dims> cell = globalIDtoCellCoord(id);
 
@@ -198,62 +197,56 @@ template <typename T, int stencil> class FsGrid {
             }
          }
 
-         int retVal;
-         int status = MPI_Cart_rank(comm3d, taskIndex.data(), &retVal);
+         // Get the task number from the communicator
+         std::pair<int,LocalID> retVal;
+         int status = MPI_Cart_rank(comm3d, taskIndex.data(), &retVal.first);
          if(status != MPI_SUCCESS) {
             std::cerr << "Unable to find FsGrid rank for global ID " << id << " (coordinates [";
             for(int i=0; i<fsgrid_dims; i++) {
                std::cerr << cell[i] << ", ";
             }
             std::cerr << "]" << std::endl;
-            return MPI_PROC_NULL;
+            return std::pair<int,LocalID>(MPI_PROC_NULL,0);
          }
 
-         return retVal;
-      }
-      /*! Get the localID (=offset into the data-array) for the given globalID
-       * \param id the global cellID of a cell.
-       */
-      LocalID getLocalIdForGlobalID(GlobalID id) {
-
-         std::array<int, fsgrid_dims> cell = globalIDtoCellCoord(id);
-
-         //TODO: The caller probably just had use calculate this very same value.
-         // Maybe we shouldn't recalculate it.
-         // Find the index in the task grid this Cell belongs to
-         std::array<int, fsgrid_dims> taskIndex;
-         for(int i=0; i<fsgrid_dims; i++) {
-            int n_per_task = globalSize[i]/ntasks[i];
-            int remainder = globalSize[i]%ntasks[i];
-
-            if(cell[i] < remainder*(n_per_task+1)) {
-               taskIndex[i] = cell[i] / (n_per_task + 1);
-            } else {
-               taskIndex[i] = remainder + (cell[i] - remainder*(n_per_task+1)) / n_per_task;
-            }
-         }
-
+         // Determine localID of that cell within the target task
          std::array<int, fsgrid_dims> thatTasksStart;
          for(int i=0; i<fsgrid_dims; i++) {
             thatTasksStart[i] = calcLocalStart(globalSize[i], ntasks[i], taskIndex[i]);
          }
 
-         LocalID result=0;
+         retVal.second = 0;
          int stride = 1;
          for(int i=0; i<fsgrid_dims; i++) {
             if(globalSize[i] <= 1) {
                // Collapsed dimension, doesn't contribute.
-               result += 0;
+               retVal.second += 0;
             } else {
-               result += stride*(cell[i] - thatTasksStart[i] + stencil);
+               retVal.second += stride*(cell[i] - thatTasksStart[i] + stencil);
                stride *= storageSize[i];
             }
          }
 
-         return result;
+         return retVal;
       }
 
-      void setFieldData(GlobalID id, T& value);
+      /*! Set grid cell wtih the given ID to the value specified. Note that this doesn't need to be a local cell.
+       * Note that this function should be concurrently called by all tasks, to allow for point-to-point communication.
+       * \param id Global cell ID to be filled
+       * \iparam value New value to be assigned to it
+       *
+       * TODO: Shouldn't this maybe rather be part of the external grid-glue?
+       */
+      void setFieldData(GlobalID id, T& value) {
+
+         // Determine Task and localID that this cell belongs to
+         std::pair<int,LocalID> TaskLid = getTaskForGlobalID(id);
+
+         if(TaskLid.first == rank) {
+            // This is our own cell, nice!
+         } else {
+         }
+      }
 
       /*! Perform ghost cell communication.
        */
@@ -290,9 +283,17 @@ template <typename T, int stencil> class FsGrid {
       }
       const T& get(int x, int y, int z) const;
 
+      T& get(LocalID id) {
+         if(id < 0 || id > data.get_size()) {
+            std::cerr << "Out-of-bounds access in FsGrid::get! Expect weirdness." << std::endl;
+         }
+         return data[id];
+      }
+
    private:
       //! MPI Cartesian communicator used in this grid
       MPI_Comm comm3d;
+      int rank;
 
       std::array<int, 27> neighbour; //!< IDs of the 26 neighbours (plus ourselves)
       std::vector<char> neighbour_index; //!< Lookup table from rank to index in the neighbour array
