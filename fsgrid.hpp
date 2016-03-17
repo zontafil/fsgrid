@@ -750,7 +750,6 @@ template <typename T, int stencil> class FsGrid {
       
    
       //! Helper function: calculate position of the local coordinate space for the given dimension
-      //TODO: Inverse of these, to get task for a given position
       // \param globalCells Number of cells in the global Simulation, in this dimension
       // \param ntasks Total number of tasks in this dimension
       // \param my_n This task's position in this dimension
@@ -766,7 +765,6 @@ template <typename T, int stencil> class FsGrid {
          }
       }
       //! Helper function: calculate size of the local coordinate space for the given dimension
-      //TODO: Inverse of these, to get task for a given position
       // \param globalCells Number of cells in the global Simulation, in this dimension
       // \param ntasks Total number of tasks in this dimension
       // \param my_n This task's position in this dimension
