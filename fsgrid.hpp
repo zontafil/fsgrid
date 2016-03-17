@@ -180,11 +180,8 @@ template <typename T, int stencil> class FsGrid {
                for(int z=-1; z<=1; z++) {
 
                   std::array<int,3> subarraySize;
-                  std::array<int,3> subarrayStart;
-                  
-                  std::array<int,3> sSize = storageSize;
-                     
-                  
+                  std::array<int,3> subarrayStart;                  
+
                   if((storageSize[0] == 1 && x!= 0 ) ||
                      (storageSize[1] == 1 && y!= 0 ) ||
                      (storageSize[2] == 1 && z!= 0 )){
@@ -214,22 +211,13 @@ template <typename T, int stencil> class FsGrid {
                   for(int i = 0;i < 3; i++)
                      if(storageSize[i] == 1) 
                         subarrayStart[i] = 0;
-/*
-                  if(rank==0)
-                     printf("create snd datatype for %d, %d, %d:  storagesize %d %d %d subarraysize  %d %d %d subarraystart %d %d %d\n", 
-                            x, y, z,
-                            storageSize[0], storageSize[1], storageSize[2], 
-                            subarraySize[0], subarraySize[1], subarraySize[2], 
-                            subarrayStart[0], subarrayStart[1], subarrayStart[2]);
-*/                
-                  int a;
 
-                  a=sSize[0];sSize[0]=sSize[2];sSize[2]=a;
-                  a=subarraySize[0];subarraySize[0]=subarraySize[2];subarraySize[2]=a;
-                  a=subarrayStart[0];subarrayStart[0]=subarrayStart[2];subarrayStart[2]=a;
-
+                  std::array<int,3> swappedStorageSize = storageSize;
+                  swapArray(swappedStorageSize);
+                  swapArray(subarraySize);
+                  swapArray(subarrayStart);                  
                   MPI_Type_create_subarray(3,
-                                           sSize.data(),
+                                           swappedStorageSize.data(),
                                            subarraySize.data(),
                                            subarrayStart.data(),
                                            MPI_ORDER_C,
@@ -257,17 +245,10 @@ template <typename T, int stencil> class FsGrid {
                   for(int i = 0;i < 3; i++)
                      if(storageSize[i] == 1) 
                         subarrayStart[i] = 0;
-/*
-                  if(rank==0)
-                     printf("create rcv datatype for %d, %d, %d:  storagesize %d %d %d subarraysize  %d %d %d subarraystart %d %d %d\n", 
-                            x, y, z,
-                            storageSize[0], storageSize[1], storageSize[2], 
-                            subarraySize[0], subarraySize[1], subarraySize[2], 
-                            subarrayStart[0], subarrayStart[1], subarrayStart[2]);
-*/                
-                  a=subarrayStart[0];subarrayStart[0]=subarrayStart[2];subarrayStart[2]=a;                  
+                  
+                  swapArray(subarrayStart);                  
                   MPI_Type_create_subarray(3,
-                                           sSize.data(),
+                                           swappedStorageSize.data(),
                                            subarraySize.data(),
                                            subarrayStart.data(),
                                            MPI_ORDER_C,
@@ -756,14 +737,13 @@ template <typename T, int stencil> class FsGrid {
                      processDomainDecomposition[0] = i;
                      processDomainDecomposition[1] = j;
                      processDomainDecomposition[2] = k;
-
                   }
                }
             }
          }
       }
-
-
+      
+   
       //! Helper function: calculate position of the local coordinate space for the given dimension
       //TODO: Inverse of these, to get task for a given position
       // \param globalCells Number of cells in the global Simulation, in this dimension
@@ -795,5 +775,10 @@ template <typename T, int stencil> class FsGrid {
             return n_per_task;
          }
       }
-
+   
+      void swapArray(std::array<int, 3>& array) {
+         int a = array[0];
+         array[0] = array[2];
+         array[2] = a;
+      }
 };
