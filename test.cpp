@@ -84,90 +84,90 @@ int main(int argc, char** argv) {
       }
       
 
-         if(rank == 0) {
-            std::cerr << " --- Test data transfer into the grid ---" << std::endl;
-         }
+      if(rank == 0) {
+         std::cerr << " --- Test data transfer into the grid ---" << std::endl;
+      }
 
-         // First, setup grid coupling to do everything from task 0
-         if(rank == 0) {
-            testGrid.setupForGridCoupling(8*8);
-            for(int y=0; y<8; y++) {
-               for(int x=0; x<8; x++) {
-                  testGrid.setGridCoupling(y*8+x,0); // All cells are coupled to 0
-               }
+      // First, setup grid coupling to do everything from task 0
+      if(rank == 0) {
+         testGrid.setupForGridCoupling(globalSize[0]*globalSize[1]);
+         for(int y=0; y<globalSize[1]; y++) {
+            for(int x=0; x<globalSize[0]; x++) {
+               testGrid.setGridCoupling(y*globalSize[0]+x,0); // All cells are coupled to 0
             }
-         } else {
-            testGrid.setupForGridCoupling(0);
          }
-         testGrid.finishGridCoupling();
+      } else {
+         testGrid.setupForGridCoupling(0);
+      }
+      testGrid.finishGridCoupling();
 
 
 
-         // Fill in some junk data from task 0
-         std::vector<int> fillData;
-         if(rank == 0) {
-            fillData.resize(8*8);
+      // Fill in some junk data from task 0
+      std::vector<int> fillData;
+      if(rank == 0) {
+         fillData.resize(globalSize[0]*globalSize[1]);
 
-            // We are going to send data for all 8×8 Cells
-            testGrid.setupForTransferIn(8*8);
-            for(int y=0; y<8; y++) {
-               for(int x=0; x<8; x++) {
-                  fillData[y*8 + x] = x*y;
+         // We are going to send data for all 8×8 Cells
+         testGrid.setupForTransferIn(globalSize[0]*globalSize[1]);
+         for(int y=0; y<globalSize[1]; y++) {
+            for(int x=0; x<globalSize[0]; x++) {
+               fillData[y*globalSize[0] + x] = x*y;
 
-                  testGrid.transferDataIn(y*8+x,fillData[y*8+x]);
-               }
+               testGrid.transferDataIn(y*globalSize[0]+x,fillData[y*globalSize[0]+x]);
             }
-         } else {
-            // The others simply recieve
-            testGrid.setupForTransferIn(0);
          }
-         testGrid.finishTransfersIn();
+      } else {
+         // The others simply recieve
+         testGrid.setupForTransferIn(0);
+      }
+      testGrid.finishTransfersIn();
 
 
-         // Now have each task output their data
-         for(int i=0; i<size; i++) {
-            if(i == rank) {
-               std::cerr << "Contents of Task #" << rank << ": " << std::endl;
-               std::array<int32_t,3> localSize = testGrid.getLocalSize();
-               for(unsigned int y=0; y<localSize[1]; y++) {
-                  for(unsigned int x=0; x<localSize[0]; x++) {
-                     std::cerr << *testGrid.get(x,y,0) << ", ";
-                  }
-                  std::cerr << std::endl;
-               }
-            }
-            MPI_Barrier(MPI_COMM_WORLD);
-         }
-
-
-         // Transfer it back
-         std::vector<int> returnedData;
-         if(rank ==0) {
-            returnedData.resize(8*8);
-
-            testGrid.setupForTransferOut(8*8);
-            for(int y=0; y<8; y++) {
-               for(int x=0; x<8; x++) {
-                  testGrid.transferDataOut(y*8+x,returnedData[y*8+x]);
-               }
-            }
-         } else {
-            testGrid.setupForTransferOut(0);
-         }
-         testGrid.finishTransfersOut();
-
-         // Validate the result
-         if(rank == 0) {
-            std::cerr << " --------- " << std::endl;
-            std::cerr << "Returned array contents:" << std::endl;
-            for(unsigned int y=0; y<8; y++) {
-               for(unsigned int x=0; x<8; x++) {
-                  std::cerr << returnedData[y*8+x] << ", ";
+      // Now have each task output their data
+      for(int i=0; i<size; i++) {
+         if(i == rank) {
+            std::cerr << "Contents of Task #" << rank << ": " << std::endl;
+            std::array<int32_t,3> localSize = testGrid.getLocalSize();
+            for(int y=0; y<localSize[1]; y++) {
+               for(int x=0; x<localSize[0]; x++) {
+                  std::cerr << *testGrid.get(x,y,0) << ", ";
                }
                std::cerr << std::endl;
             }
          }
+         MPI_Barrier(MPI_COMM_WORLD);
       }
+
+
+      // Transfer it back
+      std::vector<int> returnedData;
+      if(rank ==0) {
+         returnedData.resize(globalSize[0]*globalSize[1]);
+
+         testGrid.setupForTransferOut(globalSize[0]*globalSize[1]);
+         for(int y=0; y<globalSize[1]; y++) {
+            for(int x=0; x<globalSize[0]; x++) {
+               testGrid.transferDataOut(y*globalSize[0]+x,returnedData[y*globalSize[0]+x]);
+            }
+         }
+      } else {
+         testGrid.setupForTransferOut(0);
+      }
+      testGrid.finishTransfersOut();
+
+      // Validate the result
+      if(rank == 0) {
+         std::cerr << " --------- " << std::endl;
+         std::cerr << "Returned array contents:" << std::endl;
+         for(int y=0; y<globalSize[1]; y++) {
+            for(int x=0; x<globalSize[0]; x++) {
+               std::cerr << returnedData[y*globalSize[0]+x] << ", ";
+            }
+            std::cerr << std::endl;
+         }
+      }
+   }
       
 
       
