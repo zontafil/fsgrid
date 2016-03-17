@@ -352,8 +352,12 @@ template <typename T, int stencil> class FsGrid {
       /*! Perform ghost cell communication.
        */
       void updateGhostCells() {
-
-
+         //TODO, faster with simultaneous isends& ireceives?
+         for(int i = 0; i < 27; i++) {
+            MPI_Sendrecv(data.data(), 1, neighbourSendType[i], neighbour[i], i, 
+                         data.data(), 1, neighbourReceiveType[i], neighbour[i], i,
+                         comm3d, MPI_STATUS_IGNORE);
+         }
       }
 
       /*! Get the size of the local domain handled by this grid.
@@ -396,7 +400,7 @@ template <typename T, int stencil> class FsGrid {
       MPI_Comm comm3d;
       int rank;
 
-      std::array<int, 27> neighbour; //!< IDs of the 26 neighbours (plus ourselves)
+      std::array<int, 27> neighbour; //!< Tasks of the 26 neighbours (plus ourselves)
       std::vector<char> neighbour_index; //!< Lookup table from rank to index in the neighbour array
 
       // We have, fundamentally, two different coordinate systems we're dealing with:
