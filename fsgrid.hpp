@@ -453,8 +453,6 @@ template <typename T, int stencil> class FsGrid {
        * Note that this function should be concurrently called by all tasks, to allow for point-to-point communication.
        * \param id Global cell ID to be filled
        * \iparam value New value to be assigned to it
-       *
-       * TODO: Shouldn't this maybe rather be part of the external grid-glue?
        */
       void transferDataIn(GlobalID id, T& value) {
 
@@ -492,8 +490,6 @@ template <typename T, int stencil> class FsGrid {
       /*! Get the value of the grid cell wtih the given ID. Note that this doesn't need to be a local cell.
        * \param id Global cell ID to be read
        * \iparam target Location that the result is to be stored in
-       *
-       * TODO: Shouldn't this maybe rather be part of the external grid-glue?
        */
       void transferDataOut(GlobalID id, T& target) {
 
@@ -509,7 +505,11 @@ template <typename T, int stencil> class FsGrid {
          }
       }
 
-      //TODO: Document
+      /*! Finalize the transfer of data out of this grid, re-integrating it back
+       *! into the locations where it came from.
+       * This method assumes that transferDataOut() has been called for each cell beforehand,
+       * so that appropriate recieve buffers exist in the target ranks.
+       */
       void finishTransfersOut() {
          int status;
          for(int z=0; z<localSize[2]; z++) {
@@ -623,6 +623,11 @@ template <typename T, int stencil> class FsGrid {
          }
          return &data[id];
       }
+
+      /*! Physical grid spacing.
+       * TODO: Should this be private and have accesor-functions?
+       */
+      double DX;
 
    private:
       //! MPI Cartesian communicator used in this grid
