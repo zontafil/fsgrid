@@ -214,19 +214,20 @@ template <typename T, int stencil> class FsGrid {
                   for(int i = 0;i < 3; i++)
                      if(storageSize[i] == 1) 
                         subarrayStart[i] = 0;
+/*
                   if(rank==0)
                      printf("create snd datatype for %d, %d, %d:  storagesize %d %d %d subarraysize  %d %d %d subarraystart %d %d %d\n", 
                             x, y, z,
                             storageSize[0], storageSize[1], storageSize[2], 
                             subarraySize[0], subarraySize[1], subarraySize[2], 
                             subarrayStart[0], subarrayStart[1], subarrayStart[2]);
-                  
+*/                
                   int a;
-                  /*
+
                   a=sSize[0];sSize[0]=sSize[2];sSize[2]=a;
                   a=subarraySize[0];subarraySize[0]=subarraySize[2];subarraySize[2]=a;
                   a=subarrayStart[0];subarrayStart[0]=subarrayStart[2];subarrayStart[2]=a;
-                  */
+
                   MPI_Type_create_subarray(3,
                                            sSize.data(),
                                            subarraySize.data(),
@@ -256,15 +257,15 @@ template <typename T, int stencil> class FsGrid {
                   for(int i = 0;i < 3; i++)
                      if(storageSize[i] == 1) 
                         subarrayStart[i] = 0;
-
+/*
                   if(rank==0)
                      printf("create rcv datatype for %d, %d, %d:  storagesize %d %d %d subarraysize  %d %d %d subarraystart %d %d %d\n", 
                             x, y, z,
                             storageSize[0], storageSize[1], storageSize[2], 
                             subarraySize[0], subarraySize[1], subarraySize[2], 
                             subarrayStart[0], subarrayStart[1], subarrayStart[2]);
-                  
-                  // a=subarrayStart[0];subarrayStart[0]=subarrayStart[2];subarrayStart[2]=a;                  
+*/                
+                  a=subarrayStart[0];subarrayStart[0]=subarrayStart[2];subarrayStart[2]=a;                  
                   MPI_Type_create_subarray(3,
                                            sSize.data(),
                                            subarraySize.data(),
@@ -580,14 +581,14 @@ template <typename T, int stencil> class FsGrid {
 
                   if(neighbour[sendId] != MPI_PROC_NULL &&
                      neighbourSendType[sendId] != MPI_DATATYPE_NULL) {
-                     printf("%d: Send to %d %d %d (shift  %d) with rank %d\n", rank, x, y, z, shiftId, neighbour[sendId]);                     
+//                     printf("%d: Send to %d %d %d (shift  %d) with rank %d\n", rank, x, y, z, shiftId, neighbour[sendId]);                     
                      MPI_Isend(data.data(), 1, neighbourSendType[shiftId], neighbour[sendId], shiftId, comm3d, &(sendRequests[shiftId]));
                   }
 
                   if(neighbour[receiveId] != MPI_PROC_NULL &&
                      neighbourSendType[shiftId] != MPI_DATATYPE_NULL) {
-                     printf("%d: Receive from %d %d %d (shift %d) with rank %d\n", rank, -x, -y, -z, shiftId, neighbour[receiveId]);
-                     MPI_Irecv(data.data(), 1, neighbourSendType[shiftId], neighbour[receiveId], shiftId, comm3d, &(receiveRequests[shiftId]));
+//                     printf("%d: Receive from %d %d %d (shift %d) with rank %d\n", rank, -x, -y, -z, shiftId, neighbour[receiveId]);
+                     MPI_Irecv(data.data(), 1, neighbourReceiveType[shiftId], neighbour[receiveId], shiftId, comm3d, &(receiveRequests[shiftId]));
                   }
                   
                }
