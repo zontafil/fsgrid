@@ -188,7 +188,7 @@ template <typename T, int stencil> class FsGrid {
                      //check for 2 or 1D simulations
                      neighbourSendType[(x+1) * 9 + (y + 1) * 3 + (z + 1)] = MPI_DATATYPE_NULL;
                      neighbourReceiveType[(x+1) * 9 + (y + 1) * 3 + (z + 1)] = MPI_DATATYPE_NULL;
-                     //continue;
+                     continue;
                   }
 
                   subarraySize[0] = (x == 0) ? localSize[0] : stencil;
