@@ -145,7 +145,6 @@ template <typename T, int stencil> class FsGrid {
 
 
          // Determine size of our local grid
-         std::array<int, 3> localStart;
          for(int i=0; i<fsgrid_dims; i++) {
             localSize[i] = calcLocalSize(globalSize[i],ntasks[i], taskPosition[i]);
             localStart[i] = calcLocalStart(globalSize[i],ntasks[i], taskPosition[i]);
@@ -230,6 +229,63 @@ template <typename T, int stencil> class FsGrid {
          return retVal;
       }
 
+      /*! Determine the cell's GlobalID from its local x,y,z coordinates
+       * \param x The cell's task-local x coordinate
+       * \param y The cell's task-local y coordinate
+       * \param z The cell's task-local z coordinate
+       */
+      GlobalID GlobalIDForCoords(int x, int y, int z) {
+         return globalSize[0]*(x+localStart[0])
+            + globalSize[1]*(y+localStart[1])
+            + globalSize[2]*(z+localStart[2]);
+      }
+      /*! Determine the cell's LocalID from its local x,y,z coordinates
+       * \param x The cell's task-local x coordinate
+       * \param y The cell's task-local y coordinate
+       * \param z The cell's task-local z coordinate
+       */
+      LocalID LocalIDForCoords(int x, int y, int z) {
+         LocalID index=0;
+         if(globalSize[2] > 1) {
+            index += storageSize[0]*storageSize[1]*(stencil+z);
+         }
+         if(globalSize[1] > 1) {
+            index += storageSize[0]*(stencil+y);
+         }
+         if(globalSize[0] > 1 ) {
+            index += stencil+x;
+         }
+
+         return index;
+      }
+
+      /*! Prepare for transfer of grid cell data into this grid. 
+       * Setup MPI Irecv requests to recieve data for each grid cell, and prepare
+       * buffer space to hold the MPI requests of the sends.
+       *
+       * \param cellsToSend How many cells are going to be sent by this task
+       */
+      void setupForTransfer(int cellsToSend) {
+         int status;
+         // Make sure we have sufficient buffer space to store our mpi requests
+         recvRequests.resize(localSize[0]*localSize[1]*localSize[2]);
+         numRecvRequests=0;
+         sendRequests.resize(cellsToSend);
+         numSendRequests=0;
+
+         for(int z=0; z<localSize[2]; z++) {
+            for(int y=0; y<localSize[1]; y++) {
+               for(int x=0; x<localSize[0]; x++) {
+                  // Calculate LocalID for this cell
+                  LocalID thisCell = LocalIDForCoords(x,y,z);
+                  status = MPI_Irecv(&get(thisCell), sizeof(T), MPI_BYTE, MPI_ANY_SOURCE, thisCell, comm3d,
+                        recvRequests[numRecvRequests++]);
+                  //TODO: Error checking?
+               }
+            }
+         }
+      }
+
       /*! Set grid cell wtih the given ID to the value specified. Note that this doesn't need to be a local cell.
        * Note that this function should be concurrently called by all tasks, to allow for point-to-point communication.
        * \param id Global cell ID to be filled
@@ -242,10 +298,11 @@ template <typename T, int stencil> class FsGrid {
          // Determine Task and localID that this cell belongs to
          std::pair<int,LocalID> TaskLid = getTaskForGlobalID(id);
 
-         if(TaskLid.first == rank) {
-            // This is our own cell, nice!
-         } else {
-         }
+         // Build the MPI Isend request for this cell
+         int status;
+         status = MPI_Isend(&value, sizeof(T), MPI_BYTE, TaskLid.first, TaskLid.second, comm3d,
+               sendRequests[numSendRequests++]);
+         //TODO: Error checking?
       }
 
       /*! Perform ghost cell communication.
@@ -274,14 +331,12 @@ template <typename T, int stencil> class FsGrid {
                || z < -stencil || z > localSize[2] + stencil) {
             std::cerr << "Out-of bounds access in FsGrid::get! Expect weirdness." << std::endl;
          }
-
-         int index=storageSize[0]*storageSize[1]*z
-            + storageSize[0]*y
-            + x;
+         
+         LocalID index = LocalIDForCoords(x,y,z);
 
          return data[index];
       }
-      const T& get(int x, int y, int z) const;
+      //const T& get(int x, int y, int z) const;
 
       T& get(LocalID id) {
          if(id < 0 || id > data.get_size()) {
@@ -293,7 +348,10 @@ template <typename T, int stencil> class FsGrid {
    private:
       //! MPI Cartesian communicator used in this grid
       MPI_Comm comm3d;
-      int rank;
+      int rank; //!< This task's rank in the communicator
+      std::vector<MPI_Request*> sendRequests;
+      std::vector<MPI_Request*> recvRequests;
+      int numSendRequests, numRecvRequests;
 
       std::array<int, 27> neighbour; //!< IDs of the 26 neighbours (plus ourselves)
       std::vector<char> neighbour_index; //!< Lookup table from rank to index in the neighbour array
@@ -306,6 +364,7 @@ template <typename T, int stencil> class FsGrid {
       std::array<uint32_t,fsgrid_dims> globalSize; //!< Global size of the simulation space, in cells
       std::array<uint32_t,fsgrid_dims> localSize;  //!< Local size of simulation space handled by this task (without ghost cells)
       std::array<uint32_t,fsgrid_dims> storageSize;  //!< Local size of simulation space handled by this task (including ghost cells)
+      std::array<uint32_t,fsgrid_dims> localStart; //!< Offset of the local coordinate system against the global one
 
       //! Actual storage of field data
       std::vector<T> data;
