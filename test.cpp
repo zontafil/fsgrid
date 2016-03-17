@@ -41,6 +41,22 @@ int main(int argc, char** argv) {
       if(rank == 0) {
          std::cerr << " --- Test data transfer into the grid ---" << std::endl;
       }
+
+      // First, setup grid coupling to do everything from task 0
+      if(rank == 0) {
+         testGrid.setupForGridCoupling(8*8);
+         for(int y=0; y<8; y++) {
+            for(int x=0; x<8; x++) {
+               testGrid.setGridCoupling(y*8+x,0); // All cells are coupled to 0
+            }
+         }
+      } else {
+         testGrid.setupForGridCoupling(0);
+      }
+      testGrid.finishGridCoupling();
+
+
+
       // Fill in some junk data from task 0
       std::vector<int> fillData;
       if(rank == 0) {
@@ -52,14 +68,15 @@ int main(int argc, char** argv) {
             for(int x=0; x<8; x++) {
                fillData[y*8 + x] = x*y;
 
-               testGrid.setFieldData(y*8+x,fillData[y*8+x]);
+               testGrid.transferDataIn(y*8+x,fillData[y*8+x]);
             }
          }
       } else {
          // The others simply recieve
          testGrid.setupForTransferIn(0);
       }
-      testGrid.finishTransfers();
+      testGrid.finishTransfersIn();
+
 
       // Now have each task output their data
       for(int i=0; i<size; i++) {
@@ -68,7 +85,7 @@ int main(int argc, char** argv) {
             std::array<uint32_t,3> localSize = testGrid.getLocalSize();
             for(unsigned int y=0; y<localSize[1]; y++) {
                for(unsigned int x=0; x<localSize[0]; x++) {
-                  std::cerr << testGrid.get(x,y,0) << ", ";
+                  std::cerr << *testGrid.get(x,y,0) << ", ";
                }
                std::cerr << std::endl;
             }
@@ -76,6 +93,34 @@ int main(int argc, char** argv) {
          MPI_Barrier(MPI_COMM_WORLD);
       }
 
+
+      // Transfer it back
+      std::vector<int> returnedData;
+      if(rank ==0) {
+         returnedData.resize(8*8);
+
+         testGrid.setupForTransferOut(8*8);
+         for(int y=0; y<8; y++) {
+            for(int x=0; x<8; x++) {
+               testGrid.transferDataOut(y*8+x,returnedData[y*8+x]);
+            }
+         }
+      } else {
+         testGrid.setupForTransferOut(0);
+      }
+      testGrid.finishTransfersOut();
+
+      // Validate the result
+      if(rank == 0) {
+         std::cerr << " --------- " << std::endl;
+         std::cerr << "Returned array contents:" << std::endl;
+         for(unsigned int y=0; y<8; y++) {
+            for(unsigned int x=0; x<8; x++) {
+               std::cerr << returnedData[y*8+x] << ", ";
+            }
+            std::cerr << std::endl;
+         }
+      }
    }
    MPI_Finalize();
 
