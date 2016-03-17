@@ -182,8 +182,8 @@ template <typename T, int stencil> class FsGrid {
                      (storageSize[1] == 1 && y!= 0 ) ||
                      (storageSize[2] == 1 && z!= 0 )){
                      //check for 2 or 1D simulations
-                     neighbourSendType[(x+1) * 9 + (y + 1) * 3 + (z + 1)] = MPI_DATATYPE_NULL;
-                     neighbourReceiveType[(x+1) * 9 + (y + 1) * 3 + (z + 1)] = MPI_DATATYPE_NULL;
+                     neighbourSendType[(x+1) * 9 + (y + 1) * 3 + (z + 1)] = MPI_BYTE;
+                     neighbourReceiveType[(x+1) * 9 + (y + 1) * 3 + (z + 1)] = MPI_BYTE;
                      continue;
                   }
 
@@ -207,13 +207,13 @@ template <typename T, int stencil> class FsGrid {
                   for(int i = 0;i < 3; i++)
                      if(storageSize[i] == 1) 
                         subarrayStart[i] = 0;
-                  /*
-                  printf("create datatype for %d, %d, %d:\n %d %d %d\n %d %d %d\n %d %d %d\n", 
-                         x, y, z,
-                         storageSize[0], storageSize[1], storageSize[2], 
-                         subarraySize[0], subarraySize[1], subarraySize[2], 
-                         subarrayStart[0], subarrayStart[1], subarrayStart[2]);
-                  */
+                  if(rank==0)
+                     printf("create snd datatype for %d, %d, %d:  storagesize %d %d %d subarraysize  %d %d %d subarraystart %d %d %d\n", 
+                            x, y, z,
+                            storageSize[0], storageSize[1], storageSize[2], 
+                            subarraySize[0], subarraySize[1], subarraySize[2], 
+                            subarrayStart[0], subarrayStart[1], subarrayStart[2]);
+                  
                          
                   MPI_Type_create_subarray(3,
                                            storageSize.data(),
@@ -244,6 +244,13 @@ template <typename T, int stencil> class FsGrid {
                   for(int i = 0;i < 3; i++)
                      if(storageSize[i] == 1) 
                         subarrayStart[i] = 0;
+                  if(rank==0)
+                     printf("create rcv datatype for %d, %d, %d:  storagesize %d %d %d subarraysize  %d %d %d subarraystart %d %d %d\n", 
+                            x, y, z,
+                            storageSize[0], storageSize[1], storageSize[2], 
+                            subarraySize[0], subarraySize[1], subarraySize[2], 
+                            subarrayStart[0], subarrayStart[1], subarrayStart[2]);
+                  
                   
                   MPI_Type_create_subarray(3,
                                            storageSize.data(),
@@ -258,9 +265,9 @@ template <typename T, int stencil> class FsGrid {
          }
          
          for(int i=0;i<27;i++){
-            if(neighbourReceiveType[i] != MPI_DATATYPE_NULL)
+            if(neighbourReceiveType[i] != MPI_BYTE)
                MPI_Type_commit(&(neighbourReceiveType[i]));
-            if(neighbourSendType[i] != MPI_DATATYPE_NULL)
+            if(neighbourSendType[i] != MPI_BYTE)
                MPI_Type_commit(&(neighbourSendType[i]));
          }
       }
@@ -269,9 +276,9 @@ template <typename T, int stencil> class FsGrid {
        */
       ~FsGrid() {
          for(int i=0;i<27;i++){
-            if(neighbourReceiveType[i] != MPI_DATATYPE_NULL)
+            if(neighbourReceiveType[i] != MPI_BYTE)
                MPI_Type_free(&(neighbourReceiveType[i]));
-            if(neighbourSendType[i] != MPI_DATATYPE_NULL)
+            if(neighbourSendType[i] != MPI_BYTE)
                MPI_Type_free(&(neighbourSendType[i]));
          }
          MPI_Comm_free(&comm3d);
@@ -339,7 +346,7 @@ template <typename T, int stencil> class FsGrid {
        * TODO: Shouldn't this maybe rather be part of the external grid-glue?
        */
       void setFieldData(GlobalID id, T& value) {
-
+         
          // Determine Task and localID that this cell belongs to
          std::pair<int,LocalID> TaskLid = getTaskForGlobalID(id);
 
@@ -353,12 +360,31 @@ template <typename T, int stencil> class FsGrid {
        */
       void updateGhostCells() {
          //TODO, faster with simultaneous isends& ireceives?
-         for(int i = 0; i < 27; i++) {
-            MPI_Sendrecv(data.data(), 1, neighbourSendType[i], neighbour[i], i, 
-                         data.data(), 1, neighbourReceiveType[i], neighbour[i], i,
-                         comm3d, MPI_STATUS_IGNORE);
+         
+         for(int x=-1; x<=1;x++) {
+            for(int y=-1; y<=1;y++) {
+               for(int z=-1; z<=1; z++) {
+                  std::array<int,3> subarraySize;
+                  std::array<int,3> subarrayStart;
+                  int receiveId = (1 - x) * 9 + ( 1 - y) * 3 + ( 1 - z);
+                  int sendId = (x+1) * 9 + (y + 1) * 3 + (z + 1);
+/*                  if(neighbour[i] != MPI_PROC_NULL &&
+                    neighbourSendType[i] != MPI_DATATYPE_NULL &&
+                    neighbourReceiveType[i] != MPI_DATATYPE_NULL) {
+*/
+                  printf("%d: Send to %d %d %d ( %d) with rank %d\n", rank, x, y, z, sendId, neighbour[sendId]);
+                  printf("%d: Receive from %d %d %d ( %d) with rank %d\n", rank, -x, -y, -z, receiveId, neighbour[receiveId]);
+                  
+                  MPI_Sendrecv(data.data(), 1, neighbourSendType[sendId], neighbour[sendId], sendId, 
+                               data.data(), 1, neighbourReceiveType[receiveId], neighbour[receiveId], sendId,
+                               comm3d, MPI_STATUS_IGNORE);
+                  printf("%d: ... done\n",rank);
+               }
+            }
          }
       }
+
+   
 
       /*! Get the size of the local domain handled by this grid.
        */
@@ -380,14 +406,15 @@ template <typename T, int stencil> class FsGrid {
             std::cerr << "Out-of bounds access in FsGrid::get! Expect weirdness." << std::endl;
          }
 
-         int index=storageSize[0]*storageSize[1]*z
-            + storageSize[0]*y
-            + x;
-
+         int index=storageSize[0]*storageSize[1]* ( z + stencil) +
+            + storageSize[0]* (y + stencil)
+            + (x + xtencil);
+                               
          return data[index];
       }
-      const T& get(int x, int y, int z) const;
 
+      const T& get(int x, int y, int z) const;
+   
       T& get(LocalID id) {
          if(id < 0 || id > data.get_size()) {
             std::cerr << "Out-of-bounds access in FsGrid::get! Expect weirdness." << std::endl;
