@@ -9,48 +9,36 @@
 #include <limits>
 #include <stdint.h>
 
-static const int fsgrid_dims = 3;
-
 /*! Simple cartesian, non-loadbalancing MPI Grid for use with the fieldsolver
  *
  * \param T datastructure containing the field in each cell which this grid manages
- * \param fsgrid_dims number of dimensions this field has
  * \param stencil ghost cell width of this grid
  */
 template <typename T, int stencil> class FsGrid {
 
    public:
 
-      typedef uint64_t LocalID;
-      typedef uint64_t GlobalID;
+      typedef int64_t LocalID;
+      typedef int64_t GlobalID;
 
       /*! Constructor for this grid.
        * \param globalSize Cell size of the global simulation domain.
        * \param MPI_Comm The MPI communicator this grid should use.
        * \param isPeriodic An array specifying, for each dimension, whether it is to be treated as periodic.
        */
-      FsGrid(std::array<int32_t,fsgrid_dims> globalSize, MPI_Comm parent_comm, std::array<int,fsgrid_dims> isPeriodic)
+      FsGrid(std::array<int32_t,3> globalSize, MPI_Comm parent_comm, std::array<int,3> isPeriodic)
             : globalSize(globalSize) {
 
          int status;
          int size;
          status = MPI_Comm_size(parent_comm, &size);
 
-         // Tell MPI how many Tasks we want in which direction.
-         // By giving a value of 0, we let MPI choose this number itself.
-         //for(int i=0; i<fsgrid_dims; i++) {
-         //   if(globalSize[i] <= 1) {
-         //      ntasks[i] = 1;
-         //   } else {
-         //      ntasks[i] = 0;
-         //   }
-         //}
-         //status = MPI_Dims_create(size,fsgrid_dims,ntasks.data());
+         // Heuristically choose a good domain decomposition for our field size
          computeDomainDecomposition(globalSize, size, ntasks);
 
 
          // Create cartesian communicator
-         status = MPI_Cart_create(parent_comm, fsgrid_dims, ntasks.data(), isPeriodic.data(), 0, &comm3d);
+         status = MPI_Cart_create(parent_comm, 3, ntasks.data(), isPeriodic.data(), 0, &comm3d);
          if(status != MPI_SUCCESS) {
             std::cerr << "Creating cartesian communicatior failed when attempting to create FsGrid!" << std::endl;
             return;
@@ -67,7 +55,7 @@ template <typename T, int stencil> class FsGrid {
 
 
          // Determine our position in the resulting task-grid
-         status = MPI_Cart_coords(comm3d, rank, fsgrid_dims, taskPosition.data());
+         status = MPI_Cart_coords(comm3d, rank, 3, taskPosition.data());
          if(status != MPI_SUCCESS) {
             std::cerr << "Rank " << rank
                << " unable to determine own position in cartesian communicator when attempting to create FsGrid!"
@@ -86,7 +74,6 @@ template <typename T, int stencil> class FsGrid {
          for(int x=-1; x<=1;x++) {
             for(int y=-1; y<=1;y++) {
                for(int z=-1; z<=1; z++) {
-                  //TODO: This has 3 dimensions hardcoded!
                   std::array<int,3> neighPosition;
 
                   /*
@@ -123,7 +110,7 @@ template <typename T, int stencil> class FsGrid {
                      status = MPI_Cart_rank(comm3d, neighPosition.data(), &neighRank);
                      if(status != MPI_SUCCESS) {
                         std::cerr << "Rank " << rank << " can't determine neighbour rank at position [";
-                        for(int i=0; i<fsgrid_dims; i++) {
+                        for(int i=0; i<3; i++) {
                            std::cerr << neighPosition[i] << ", ";
                         }
                         std::cerr << "]" << std::endl;
@@ -145,8 +132,7 @@ template <typename T, int stencil> class FsGrid {
 
 
          // Determine size of our local grid
-         std::array<int, 3> localStart;
-         for(int i=0; i<fsgrid_dims; i++) {
+         for(int i=0; i<3; i++) {
             localSize[i] = calcLocalSize(globalSize[i],ntasks[i], taskPosition[i]);
             localStart[i] = calcLocalStart(globalSize[i],ntasks[i], taskPosition[i]);
          }
@@ -157,7 +143,7 @@ template <typename T, int stencil> class FsGrid {
 
          // Allocate local storage array
          size_t totalStorageSize=1;
-         for(int i=0; i<fsgrid_dims; i++) {
+         for(int i=0; i<3; i++) {
             if(globalSize[i] <= 1) {
                // Collapsed dimension => only one cell thick
                storageSize[i] = 1;
@@ -168,6 +154,7 @@ template <typename T, int stencil> class FsGrid {
             totalStorageSize *= storageSize[i];
          }
          data.resize(totalStorageSize);
+
 
          MPI_Datatype mpiTypeT;
          MPI_Type_contiguous(sizeof(T), MPI_BYTE, &mpiTypeT);
@@ -270,6 +257,15 @@ template <typename T, int stencil> class FsGrid {
             if(neighbourSendType[i] != MPI_BYTE)
                MPI_Type_commit(&(neighbourSendType[i]));
          }
+         
+         // Also set up coupling information to external grid (fill with MPI_PROC_NULL to begin with)
+         // Before actual grid coupling can be done, this information has to be filled in.
+         externalRank.resize(totalStorageSize);
+         for(int i=0; i<externalRank.size(); i++) {
+            externalRank[i] = MPI_PROC_NULL;
+         }
+
+
       }
 
       /*! Destructor, cleans up the cartesian communicator
@@ -290,11 +286,11 @@ template <typename T, int stencil> class FsGrid {
        */
       std::pair<int,LocalID> getTaskForGlobalID(GlobalID id) {
          // Transform globalID to global cell coordinate
-         std::array<int, fsgrid_dims> cell = globalIDtoCellCoord(id);
+         std::array<int, 3> cell = globalIDtoCellCoord(id);
 
          // Find the index in the task grid this Cell belongs to
-         std::array<int, fsgrid_dims> taskIndex;
-         for(int i=0; i<fsgrid_dims; i++) {
+         std::array<int, 3> taskIndex;
+         for(int i=0; i<3; i++) {
             int n_per_task = globalSize[i]/ntasks[i];
             int remainder = globalSize[i]%ntasks[i];
 
@@ -310,7 +306,7 @@ template <typename T, int stencil> class FsGrid {
          int status = MPI_Cart_rank(comm3d, taskIndex.data(), &retVal.first);
          if(status != MPI_SUCCESS) {
             std::cerr << "Unable to find FsGrid rank for global ID " << id << " (coordinates [";
-            for(int i=0; i<fsgrid_dims; i++) {
+            for(int i=0; i<3; i++) {
                std::cerr << cell[i] << ", ";
             }
             std::cerr << "]" << std::endl;
@@ -318,14 +314,14 @@ template <typename T, int stencil> class FsGrid {
          }
 
          // Determine localID of that cell within the target task
-         std::array<int, fsgrid_dims> thatTasksStart;
-         for(int i=0; i<fsgrid_dims; i++) {
+         std::array<int, 3> thatTasksStart;
+         for(int i=0; i<3; i++) {
             thatTasksStart[i] = calcLocalStart(globalSize[i], ntasks[i], taskIndex[i]);
          }
 
          retVal.second = 0;
          int stride = 1;
-         for(int i=0; i<fsgrid_dims; i++) {
+         for(int i=0; i<3; i++) {
             if(globalSize[i] <= 1) {
                // Collapsed dimension, doesn't contribute.
                retVal.second += 0;
@@ -338,6 +334,121 @@ template <typename T, int stencil> class FsGrid {
          return retVal;
       }
 
+      /*! Determine the cell's GlobalID from its local x,y,z coordinates
+       * \param x The cell's task-local x coordinate
+       * \param y The cell's task-local y coordinate
+       * \param z The cell's task-local z coordinate
+       */
+      GlobalID GlobalIDForCoords(int x, int y, int z) {
+         return globalSize[0]*(x+localStart[0])
+            + globalSize[1]*(y+localStart[1])
+            + globalSize[2]*(z+localStart[2]);
+      }
+      /*! Determine the cell's LocalID from its local x,y,z coordinates
+       * \param x The cell's task-local x coordinate
+       * \param y The cell's task-local y coordinate
+       * \param z The cell's task-local z coordinate
+       */
+      LocalID LocalIDForCoords(int x, int y, int z) {
+         LocalID index=0;
+         if(globalSize[2] > 1) {
+            index += storageSize[0]*storageSize[1]*(stencil+z);
+         }
+         if(globalSize[1] > 1) {
+            index += storageSize[0]*(stencil+y);
+         }
+         if(globalSize[0] > 1 ) {
+            index += stencil+x;
+         }
+
+         return index;
+      }
+
+      /*! Prepare for transfer of Rank information from a coupled grid.
+       * Setup MPI Irecv requests to recieve data for each grid cell, and prepare
+       * buffer space to hold the MPI requests of the sends.
+       *
+       * \param cellsToCouple How many cells are going to be coupled
+       */
+      void setupForGridCoupling(int cellsToCouple) {
+         int status;
+         // Make sure we have sufficient buffer space to store our mpi requests
+         requests.resize(localSize[0]*localSize[1]*localSize[2] + cellsToCouple);
+         numRequests=0;
+
+         for(int z=0; z<localSize[2]; z++) {
+            for(int y=0; y<localSize[1]; y++) {
+               for(int x=0; x<localSize[0]; x++) {
+                  // Calculate LocalID for this cell
+                  LocalID thisCell = LocalIDForCoords(x,y,z);
+                  status = MPI_Irecv(&externalRank[thisCell], 1, MPI_INT, MPI_ANY_SOURCE, thisCell, comm3d,
+                        &requests[numRequests++]);
+                  if(status != MPI_SUCCESS) {
+                     std::cerr << "Error setting up MPI Irecv in FsGrid::setupForGridCoupling" << std::endl;
+                  }
+               }
+            }
+         }
+      }
+
+      /*! Set the MPI rank responsible for external communication with the given cell.
+       * If, for example, a separate grid is used in another part of the code, this would be the rank
+       * in that grid, responsible for the information in this cell.
+       *
+       * This only needs to be called if the association changes (such as: on startup, and in a load
+       * balancing step)
+       *
+       * \param id Global cell ID to be addressed
+       * \iparam rank
+       */
+      void setGridCoupling(GlobalID id, int rank) {
+
+         // Determine Task and localID that this cell belongs to
+         std::pair<int,LocalID> TaskLid = getTaskForGlobalID(id);
+
+         // Build the MPI Isend request for this cell
+         int status;
+         status = MPI_Isend(&rank, 1, MPI_INT, TaskLid.first, TaskLid.second, comm3d,
+               &requests[numRequests++]);
+         if(status != MPI_SUCCESS) {
+            std::cerr << "Error setting up MPI Isend in FsGrid::setFieldData" << std::endl;
+         }
+      }
+
+      /*! Called after setting up the transfers into or out of this grid.
+       * Basically only does a MPI_Waitall for all requests.
+       */
+      void finishGridCoupling() {
+         MPI_Waitall(numRequests,requests.data(),MPI_STATUSES_IGNORE);
+      }
+
+      /*! Prepare for transfer of grid cell data into this grid. 
+       * Setup MPI Irecv requests to recieve data for each grid cell, and prepare
+       * buffer space to hold the MPI requests of the sends.
+       *
+       * \param cellsToSend How many cells are going to be sent by this task
+       */
+      void setupForTransferIn(int cellsToSend) {
+         int status;
+         // Make sure we have sufficient buffer space to store our mpi requests
+         requests.resize(localSize[0]*localSize[1]*localSize[2] + cellsToSend);
+         numRequests=0;
+
+         for(int z=0; z<localSize[2]; z++) {
+            for(int y=0; y<localSize[1]; y++) {
+               for(int x=0; x<localSize[0]; x++) {
+                  // Calculate LocalID for this cell
+                  LocalID thisCell = LocalIDForCoords(x,y,z);
+                  status = MPI_Irecv(get(thisCell), sizeof(T), MPI_BYTE, externalRank[thisCell], thisCell, comm3d,
+                        &requests[numRequests++]);
+                  if(status != MPI_SUCCESS) {
+                     std::cerr << "Error setting up MPI Irecv in FsGrid::setupForTransferIn" << std::endl;
+                  }
+               }
+            }
+         }
+      }
+
       /*! Set grid cell wtih the given ID to the value specified. Note that this doesn't need to be a local cell.
        * Note that this function should be concurrently called by all tasks, to allow for point-to-point communication.
        * \param id Global cell ID to be filled
@@ -345,15 +456,77 @@ template <typename T, int stencil> class FsGrid {
        *
        * TODO: Shouldn't this maybe rather be part of the external grid-glue?
        */
-      void setFieldData(GlobalID id, T& value) {
-         
+      void transferDataIn(GlobalID id, T& value) {
+
          // Determine Task and localID that this cell belongs to
          std::pair<int,LocalID> TaskLid = getTaskForGlobalID(id);
 
-         if(TaskLid.first == rank) {
-            // This is our own cell, nice!
-         } else {
+         // Build the MPI Isend request for this cell
+         int status;
+         status = MPI_Isend(&value, sizeof(T), MPI_BYTE, TaskLid.first, TaskLid.second, comm3d,
+               &requests[numRequests++]);
+         if(status != MPI_SUCCESS) {
+            std::cerr << "Error setting up MPI Isend in FsGrid::setFieldData" << std::endl;
          }
+      }
+      /*! Called after setting up the transfers into or out of this grid.
+       * Basically only does a MPI_Waitall for all requests.
+       */
+      void finishTransfersIn() {
+         MPI_Waitall(numRequests,requests.data(),MPI_STATUSES_IGNORE);
+      }
+
+
+      /*! Prepare for transfer of grid cell data out of this grid.
+       * Setup MPI Isend requests to send data for each grid cell, and prepare
+       * buffer space to hold the MPI requests of the sends.
+       *
+       * \param cellsToSend How many cells are going to be sent by this task
+       */
+      void setupForTransferOut(int cellsToRecieve) {
+         // Make sure we have sufficient buffer space to store our mpi requests
+         requests.resize(localSize[0]*localSize[1]*localSize[2] + cellsToRecieve);
+         numRequests=0;
+      }
+
+      /*! Get the value of the grid cell wtih the given ID. Note that this doesn't need to be a local cell.
+       * \param id Global cell ID to be read
+       * \iparam target Location that the result is to be stored in
+       *
+       * TODO: Shouldn't this maybe rather be part of the external grid-glue?
+       */
+      void transferDataOut(GlobalID id, T& target) {
+
+         // Determine Task and localID that this cell belongs to
+         std::pair<int,LocalID> TaskLid = getTaskForGlobalID(id);
+
+         // Build the MPI Irecv request for this cell
+         int status;
+         status = MPI_Irecv(&target, sizeof(T), MPI_BYTE, TaskLid.first, TaskLid.second, comm3d,
+               &requests[numRequests++]);
+         if(status != MPI_SUCCESS) {
+            std::cerr << "Error setting up MPI Isend in FsGrid::setFieldData" << std::endl;
+         }
+      }
+
+      //TODO: Document
+      void finishTransfersOut() {
+         int status;
+         for(int z=0; z<localSize[2]; z++) {
+            for(int y=0; y<localSize[1]; y++) {
+               for(int x=0; x<localSize[0]; x++) {
+                  // Calculate LocalID for this cell
+                  LocalID thisCell = LocalIDForCoords(x,y,z);
+                  status = MPI_Isend(get(thisCell), sizeof(T), MPI_BYTE, externalRank[thisCell], thisCell, comm3d,
+                        &requests[numRequests++]);
+                  if(status != MPI_SUCCESS) {
+                     std::cerr << "Error setting up MPI Irecv in FsGrid::setupForTransferIn" << std::endl;
+                  }
+               }
+            }
+         }
+
+         MPI_Waitall(numRequests,requests.data(),MPI_STATUSES_IGNORE);
       }
 
       /*! Perform ghost cell communication.
@@ -388,7 +561,7 @@ template <typename T, int stencil> class FsGrid {
 
       /*! Get the size of the local domain handled by this grid.
        */
-      std::array<int, fsgrid_dims>& getLocalSize() {
+      std::array<int32_t, 3>& getLocalSize() {
          return localSize;
       }
 
@@ -398,49 +571,87 @@ template <typename T, int stencil> class FsGrid {
        * \param z z-Coordinate, in cells
        * \return A reference to cell data in the given cell
        */
-      T& get(int x, int y, int z) {
-         //TODO: remove this sanity check once everything works
-         if(x < -stencil || x > localSize[0] + stencil
-               || y < -stencil || y > localSize[1] + stencil
-               || z < -stencil || z > localSize[2] + stencil) {
-            std::cerr << "Out-of bounds access in FsGrid::get! Expect weirdness." << std::endl;
+      T* get(int x, int y, int z) {
+
+         // Santiy-Check that the requested cell is actually inside our domain
+         // TODO: ugh, this is ugly.
+         bool inside=true;
+         if(localSize[0] <= 1) {
+            if(x != 0) {
+               inside = false;
+            }
+         } else {
+            if(x < -stencil || x > localSize[0] + stencil) {
+               inside = false;
+            }
          }
 
-         int index=storageSize[0]*storageSize[1]* ( z + stencil) +
-            + storageSize[0]* (y + stencil)
-            + (x + xtencil);
-                               
-         return data[index];
+         if(localSize[1] <= 1) {
+            if(y != 0) {
+               inside = false;
+            }
+         } else {
+            if(y < -stencil || y > localSize[1] + stencil) {
+               inside = false;
+            }
+         }
+
+         if(localSize[2] <= 1) {
+            if(z != 0) {
+               inside = false;
+            }
+         } else {
+            if(z < -stencil || z > localSize[2] + stencil) {
+               inside = false;
+            }
+         }
+
+         if(!inside) {
+            std::cerr << "Out-of bounds access in FsGrid::get! Expect weirdness." << std::endl;
+            return NULL;
+         }
+         
+         LocalID index = LocalIDForCoords(x,y,z);
+
+         return &data[index];
       }
 
-      const T& get(int x, int y, int z) const;
-   
-      T& get(LocalID id) {
-         if(id < 0 || id > data.get_size()) {
+      T* get(LocalID id) {
+         if(id < 0 || id > data.size()) {
             std::cerr << "Out-of-bounds access in FsGrid::get! Expect weirdness." << std::endl;
+            return NULL;
          }
-         return data[id];
+         return &data[id];
       }
 
    private:
       //! MPI Cartesian communicator used in this grid
       MPI_Comm comm3d;
-      int rank;
+      int rank; //!< This task's rank in the communicator
+      std::vector<MPI_Request> requests;
+      int numRequests;
+
+      std::vector<int> externalRank; //!< MPI rank that each cell is being communicated to externally
 
       std::array<int, 27> neighbour; //!< Tasks of the 26 neighbours (plus ourselves)
       std::vector<char> neighbour_index; //!< Lookup table from rank to index in the neighbour array
 
       // We have, fundamentally, two different coordinate systems we're dealing with:
       // 1) Task grid in the MPI_Cartcomm
-      std::array<int,fsgrid_dims> ntasks; //!< Number of tasks in each direction
-      std::array<int, fsgrid_dims> taskPosition; //!< This task's position in the 3d task grid
+      std::array<int, 3> ntasks; //!< Number of tasks in each direction
+      std::array<int, 3> taskPosition; //!< This task's position in the 3d task grid
       // 2) Cell numbers in global and local view
-      std::array<int32_t,fsgrid_dims> globalSize; //!< Global size of the simulation space, in cells
-      std::array<int32_t,fsgrid_dims> localSize;  //!< Local size of simulation space handled by this task (without ghost cells)
-      std::array<int32_t,fsgrid_dims> storageSize;  //!< Local size of simulation space handled by this task (including ghost cells)
+
+      std::array<int32_t, 3> globalSize; //!< Global size of the simulation space, in cells
+      std::array<int32_t, 3> localSize;  //!< Local size of simulation space handled by this task (without ghost cells)
+      std::array<int32_t, 3> storageSize;  //!< Local size of simulation space handled by this task (including ghost cells)
+      std::array<int32_t, 3> localStart; //!< Offset of the local
+                                          //!coordinate system against
+                                          //!the global one
 
       std::array<MPI_Datatype, 27> neighbourSendType; //!< Datatype for sending data
       std::array<MPI_Datatype, 27> neighbourReceiveType; //!< Datatype for receiving data
+
 
 
       //! Actual storage of field data
@@ -449,13 +660,13 @@ template <typename T, int stencil> class FsGrid {
       //! Helper function: given a global cellID, calculate the global cell coordinate from it.
       // This is then used do determine the task responsible for this cell, and the
       // local cell index in it.
-      std::array<int, fsgrid_dims> globalIDtoCellCoord(GlobalID id) {
+      std::array<int, 3> globalIDtoCellCoord(GlobalID id) {
 
          // Transform globalID to global cell coordinate
-         std::array<int, fsgrid_dims> cell;
+         std::array<int, 3> cell;
 
          int stride=1;
-         for(int i=0; i<fsgrid_dims; i++) {
+         for(int i=0; i<3; i++) {
             cell[i] = (id / stride) % globalSize[i];
             stride *= globalSize[i];
          }
