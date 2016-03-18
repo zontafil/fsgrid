@@ -254,7 +254,7 @@ template <typename T, int stencil> class FsGrid {
                }
             }
          }
-
+         
          for(int i=0;i<27;i++){
             if(neighbourReceiveType[i] != MPI_DATATYPE_NULL)
                MPI_Type_commit(&(neighbourReceiveType[i]));
@@ -265,7 +265,7 @@ template <typename T, int stencil> class FsGrid {
          // Also set up coupling information to external grid (fill with MPI_PROC_NULL to begin with)
          // Before actual grid coupling can be done, this information has to be filled in.
          externalRank.resize(totalStorageSize);
-         for(int i=0; i<externalRank.size(); i++) {
+         for(uint i=0; i<externalRank.size(); i++) {
             externalRank[i] = MPI_PROC_NULL;
          }
 

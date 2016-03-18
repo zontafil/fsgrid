@@ -14,7 +14,7 @@ template<class T, int stencil> void timeit(std::array<int32_t, 3> globalSize, st
    }
    t2=MPI_Wtime();
    if(rank==0)
-      printf("%g s per update: nprocs %d, grid is %d x %d x %d, stencil %d, element size %d \n", (t2 - t1)/iterations, size, globalSize[0], globalSize[1], globalSize[2], stencil, sizeof(*testGrid.get(0,0,0)));
+      printf("%g s per update: nprocs %d, grid is %d x %d x %d, stencil %d, element size %ld \n", (t2 - t1)/iterations, size, globalSize[0], globalSize[1], globalSize[2], stencil, sizeof(*testGrid.get(0,0,0)));
 }
 
 
