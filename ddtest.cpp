@@ -6,7 +6,7 @@
 #include <limits>
 
 
-void computeDomainDecomposition(const std::array<uint32_t, 3>& GlobalSize, int nProcs, std::array<uint32_t,3>& processDomainDecomposition) {
+void computeDomainDecomposition(const std::array<int, 3>& GlobalSize, int nProcs, std::array<int,3>& processDomainDecomposition) {
   
    std::array<double, 3> systemDim;
    std::array<double, 3 > processBox;
@@ -16,23 +16,19 @@ void computeDomainDecomposition(const std::array<uint32_t, 3>& GlobalSize, int n
       systemDim[i] = (double)GlobalSize[i];
    }
    processDomainDecomposition = {1, 1, 1};
-  
-   for (int i = 1; i <= nProcs; i++) {
-      if( i  > systemDim[0])
-         continue;
+   
+   for (int i = 1; i <= std::min(nProcs, GlobalSize[0]); i++) {
       processBox[0] = std::max(systemDim[0]/i, 1.0);
-    
-      for (int j = 1; j <= nProcs; j++) {
-         if( i * j  > nProcs || j > systemDim[1])
-            continue;
-       
+      for (int j = 1; j <= std::min(nProcs, GlobalSize[1]) ; j++) {
+         if( i * j  > nProcs )
+            break;
          processBox[1] = std::max(systemDim[1]/j, 1.0);
-         for (int k = 1; k <= nProcs; k++) {
-            if( i * j * k > nProcs || k > systemDim[2])
-               continue;
+         for (int k = 1; k <= std::min(nProcs, GlobalSize[2]); k++) {
+            if( i * j * k > nProcs )
+               break;
             processBox[2] = std::max(systemDim[2]/k, 1.0);
             double value = 
-               1000 * processBox[0] * processBox[1] * processBox[2] + 
+               10 * processBox[0] * processBox[1] * processBox[2] + 
                (i > 1 ? processBox[1] * processBox[2]: 0) +
                (j > 1 ? processBox[0] * processBox[2]: 0) +
                (k > 1 ? processBox[0] * processBox[1]: 0);
@@ -51,8 +47,8 @@ void computeDomainDecomposition(const std::array<uint32_t, 3>& GlobalSize, int n
 
 int main(int argc, char **argv){
   
-   std::array<uint32_t,3>  sys;
-   std::array<uint32_t,3> processDomainDecomposition;
+   std::array<int,3>  sys;
+   std::array<int,3> processDomainDecomposition;
 
    if(argc != 5) {
       printf("Usage %s size_x size_y size_z nProcesses\n", argv[0]);
