@@ -7,11 +7,14 @@ template<class T, int stencil> void timeit(std::array<int32_t, 3> globalSize, st
    int rank,size;
    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
    MPI_Comm_size(MPI_COMM_WORLD, &size);
+   testGrid.updateGhostCells();         
 
-   t1=MPI_Wtime();      
+   MPI_Barrier(MPI_COMM_WORLD);   
+   t1=MPI_Wtime();  
    for(int i = 0; i < iterations; i++) {
       testGrid.updateGhostCells();         
    }
+   MPI_Barrier(MPI_COMM_WORLD);   
    t2=MPI_Wtime();
    if(rank==0)
       printf("%g s per update: nprocs %d, grid is %d x %d x %d, stencil %d, element size %ld \n", (t2 - t1)/iterations, size, globalSize[0], globalSize[1], globalSize[2], stencil, sizeof(*testGrid.get(0,0,0)));

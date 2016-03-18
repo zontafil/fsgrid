@@ -1,5 +1,5 @@
 CXX=CC
-CXXFLAGS= -std=c++11 -march=native -g -Wall
+CXXFLAGS= -O3 -std=c++11 -march=native -g -Wall
 
 benchmark: benchmark.cpp fsgrid.hpp
 	$(CXX) $(CXXFLAGS) -o $@ $<
