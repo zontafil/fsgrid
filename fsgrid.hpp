@@ -693,39 +693,32 @@ template <typename T, int stencil> class FsGrid {
       }
 
       //! Helper function to optimize decomposition of this grid over the given number of tasks
-      void computeDomainDecomposition(const std::array<int32_t, 3>& GlobalSize, int nProcs, 
-            std::array<int,3>& processDomainDecomposition) {
 
+   
+      void computeDomainDecomposition(const std::array<int, 3>& GlobalSize, int nProcs, std::array<int,3>& processDomainDecomposition) {
          std::array<double, 3> systemDim;
          std::array<double, 3 > processBox;
          double optimValue = std::numeric_limits<double>::max();
-
-         processDomainDecomposition = {1,1,1};
-
          for(int i = 0; i < 3; i++) {
             systemDim[i] = (double)GlobalSize[i];
          }
-
-         for (int i = 1; i<= nProcs; i++) {
-            if( i  > systemDim[0])
-               continue;
+         processDomainDecomposition = {1, 1, 1};
+         for (int i = 1; i <= std::min(nProcs, GlobalSize[0]); i++) {
             processBox[0] = std::max(systemDim[0]/i, 1.0);
-
-            for (int j = 1; j<= nProcs; j++) {
-               if( i * j  >nProcs || j > systemDim[1])
-                  continue;
-
+            for (int j = 1; j <= std::min(nProcs, GlobalSize[1]) ; j++) {
+               if( i * j  > nProcs )
+                  break;
                processBox[1] = std::max(systemDim[1]/j, 1.0);
-               for (int k = 1; k<= nProcs; k++) {
-                  if( i * j * k >nProcs || k > systemDim[2])
-                     continue;
+               for (int k = 1; k <= std::min(nProcs, GlobalSize[2]); k++) {
+                  if( i * j * k > nProcs )
+                     break;
                   processBox[2] = std::max(systemDim[2]/k, 1.0);
                   double value = 
-                     100 * processBox[0] * processBox[1] * processBox[2] + 
+                     10 * processBox[0] * processBox[1] * processBox[2] + 
                      (i > 1 ? processBox[1] * processBox[2]: 0) +
                      (j > 1 ? processBox[0] * processBox[2]: 0) +
                      (k > 1 ? processBox[0] * processBox[1]: 0);
-
+	
                   if(value < optimValue ){
                      optimValue = value;
                      processDomainDecomposition[0] = i;
@@ -736,7 +729,6 @@ template <typename T, int stencil> class FsGrid {
             }
          }
       }
-      
    
       //! Helper function: calculate position of the local coordinate space for the given dimension
       // \param globalCells Number of cells in the global Simulation, in this dimension
