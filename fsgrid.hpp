@@ -585,6 +585,23 @@ template <typename T, int stencil> class FsGrid {
          return localSize;
       }
 
+      /*! Calculate global cell position (XYZ in global cell space) from local cell coordinates.
+       *
+       * \param x x-Coordinate, in cells
+       * \param y y-Coordinate, in cells
+       * \param z z-Coordinate, in cells
+       *
+       * \return Global cell coordinates
+       */
+      std::array<int32_t, 3>& getGlobalIndices(int x, int y, int z) {
+         std::array<int32_t, 3> retval;
+         retval[0] = localStart[0] + x;
+         retval[1] = localStart[1] + y;
+         retval[2] = localStart[2] + z;
+
+         return retval;
+      }
+
       /*! Get a reference to the field data in a cell
        * \param x x-Coordinate, in cells
        * \param y y-Coordinate, in cells
