@@ -665,7 +665,7 @@ template <typename T, int stencil> class FsGrid {
       /*! Physical grid spacing.
        * TODO: Should this be private and have accesor-functions?
        */
-      double DX;
+      double DX,DY,DZ;
 
    private:
       //! MPI Cartesian communicator used in this grid
