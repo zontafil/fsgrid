@@ -594,7 +594,7 @@ template <typename T, int stencil> class FsGrid {
        *
        * \return Global cell coordinates
        */
-      std::array<int32_t, 3>& getGlobalIndices(int x, int y, int z) {
+      std::array<int32_t, 3> getGlobalIndices(int x, int y, int z) {
          std::array<int32_t, 3> retval;
          retval[0] = localStart[0] + x;
          retval[1] = localStart[1] + y;
