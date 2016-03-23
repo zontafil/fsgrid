@@ -417,7 +417,7 @@ template <typename T, int stencil> class FsGrid {
          status = MPI_Isend(&rank, 1, MPI_INT, TaskLid.first, TaskLid.second, comm3d,
                &requests[numRequests++]);
          if(status != MPI_SUCCESS) {
-            std::cerr << "Error setting up MPI Isend in FsGrid::setFieldData" << std::endl;
+            std::cerr << "Error setting up MPI Isend in FsGrid::setGridCoupling" << std::endl;
          }
       }
 
@@ -460,17 +460,17 @@ template <typename T, int stencil> class FsGrid {
        * \param id Global cell ID to be filled
        * \iparam value New value to be assigned to it
        */
-      void transferDataIn(GlobalID id, T& value) {
+      void transferDataIn(GlobalID id, T* value) {
 
          // Determine Task and localID that this cell belongs to
          std::pair<int,LocalID> TaskLid = getTaskForGlobalID(id);
 
          // Build the MPI Isend request for this cell
          int status;
-         status = MPI_Isend(&value, sizeof(T), MPI_BYTE, TaskLid.first, TaskLid.second, comm3d,
+         status = MPI_Isend(value, sizeof(T), MPI_BYTE, TaskLid.first, TaskLid.second, comm3d,
                &requests[numRequests++]);
          if(status != MPI_SUCCESS) {
-            std::cerr << "Error setting up MPI Isend in FsGrid::setFieldData" << std::endl;
+            std::cerr << "Error setting up MPI Isend in FsGrid::transferDataIn" << std::endl;
          }
       }
       /*! Called after setting up the transfers into or out of this grid.
@@ -497,7 +497,7 @@ template <typename T, int stencil> class FsGrid {
        * \param id Global cell ID to be read
        * \iparam target Location that the result is to be stored in
        */
-      void transferDataOut(GlobalID id, T& target) {
+      void transferDataOut(GlobalID id, T* target) {
 
          // Determine Task and localID that this cell belongs to
          std::pair<int,LocalID> TaskLid = getTaskForGlobalID(id);
@@ -507,7 +507,7 @@ template <typename T, int stencil> class FsGrid {
          status = MPI_Irecv(&target, sizeof(T), MPI_BYTE, TaskLid.first, TaskLid.second, comm3d,
                &requests[numRequests++]);
          if(status != MPI_SUCCESS) {
-            std::cerr << "Error setting up MPI Isend in FsGrid::setFieldData" << std::endl;
+            std::cerr << "Error setting up MPI Isend in FsGrid::transferDataOut" << std::endl;
          }
       }
 
