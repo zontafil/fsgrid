@@ -1,5 +1,5 @@
 #include <iostream>
-#include "fsgrid.hpp"
+#include "../fsgrid.hpp"
 /*
   Copyright (C) 2016 Finnish Meteorological Institute
   Copyright (C) 2016 CSC -IT Center for Science 

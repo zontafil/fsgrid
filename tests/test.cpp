@@ -20,7 +20,7 @@
 */
 
 #include <iostream>
-#include "fsgrid.hpp"
+#include "../fsgrid.hpp"
 
 int main(int argc, char** argv) {
    
