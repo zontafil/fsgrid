@@ -644,22 +644,26 @@ template <typename T, int stencil> class FsGrid {
             }
          } else {
             if(x < -stencil || x > localSize[0] + stencil) {
+               std::cerr << "x = " << x << " is outside of [ " << -stencil << 
+                  ", " << localSize[0] + stencil << "]!" << std::endl;
                inside = false;
             }
          }
 
-         if(localSize[1] <= 1 && !periodic[0]) {
+         if(localSize[1] <= 1 && !periodic[1]) {
             if(y != 0) {
                std::cerr << "y != 0 despite non-periodic y-axis with only one cell." << std::endl;
                inside = false;
             }
          } else {
             if(y < -stencil || y > localSize[1] + stencil) {
+               std::cerr << "y = " << x << " is outside of [ " << -stencil << 
+                  ", " << localSize[1] + stencil << "]!" << std::endl;
                inside = false;
             }
          }
 
-         if(localSize[2] <= 1 && !periodic[0]) {
+         if(localSize[2] <= 1 && !periodic[2]) {
             if(z != 0) {
                std::cerr << "z != 0 despite non-periodic z-axis with only one cell." << std::endl;
                inside = false;
@@ -667,6 +671,8 @@ template <typename T, int stencil> class FsGrid {
          } else {
             if(z < -stencil || z > localSize[2] + stencil) {
                inside = false;
+               std::cerr << "z = " << x << " is outside of [ " << -stencil << 
+                  ", " << localSize[2] + stencil << "]!" << std::endl;
             }
          }
 
