@@ -37,6 +37,7 @@ template <typename T, int stencil> class FsGrid {
          // Heuristically choose a good domain decomposition for our field size
          computeDomainDecomposition(globalSize, size, ntasks);
 
+         periodic = isPeriodic;
 
          // Create cartesian communicator
          status = MPI_Cart_create(parent_comm, 3, ntasks.data(), isPeriodic.data(), 0, &comm3d);
@@ -614,8 +615,9 @@ template <typename T, int stencil> class FsGrid {
          // Santiy-Check that the requested cell is actually inside our domain
          // TODO: ugh, this is ugly.
          bool inside=true;
-         if(localSize[0] <= 1) {
+         if(localSize[0] <= 1 && !periodic[0]) {
             if(x != 0) {
+               std::cerr << "x != 0 despite non-periodic x-axis with only one cell." << std::endl;
                inside = false;
             }
          } else {
@@ -624,8 +626,9 @@ template <typename T, int stencil> class FsGrid {
             }
          }
 
-         if(localSize[1] <= 1) {
+         if(localSize[1] <= 1 && !periodic[0]) {
             if(y != 0) {
+               std::cerr << "y != 0 despite non-periodic y-axis with only one cell." << std::endl;
                inside = false;
             }
          } else {
@@ -634,8 +637,9 @@ template <typename T, int stencil> class FsGrid {
             }
          }
 
-         if(localSize[2] <= 1) {
+         if(localSize[2] <= 1 && !periodic[0]) {
             if(z != 0) {
+               std::cerr << "z != 0 despite non-periodic z-axis with only one cell." << std::endl;
                inside = false;
             }
          } else {
@@ -656,7 +660,9 @@ template <typename T, int stencil> class FsGrid {
 
       T* get(LocalID id) {
          if(id < 0 || id > data.size()) {
-            std::cerr << "Out-of-bounds access in FsGrid::get! Expect weirdness." << std::endl;
+            std::cerr << "Out-of-bounds access in FsGrid::get!" << std::endl
+               << "(LocalID = " << id << ", but storage space is " << data.size()
+               << ". Expect weirdness." << std::endl;
             return NULL;
          }
          return &data[id];
@@ -685,6 +691,7 @@ template <typename T, int stencil> class FsGrid {
       std::array<int, 3> taskPosition; //!< This task's position in the 3d task grid
       // 2) Cell numbers in global and local view
 
+      std::array<bool, 3> periodic; //!< Information about whether a given direction is periodic
       std::array<int32_t, 3> globalSize; //!< Global size of the simulation space, in cells
       std::array<int32_t, 3> localSize;  //!< Local size of simulation space handled by this task (without ghost cells)
       std::array<int32_t, 3> storageSize;  //!< Local size of simulation space handled by this task (including ghost cells)
