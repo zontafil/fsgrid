@@ -43,20 +43,26 @@ template <typename T, int stencil> class FsGrid {
        * \param MPI_Comm The MPI communicator this grid should use.
        * \param isPeriodic An array specifying, for each dimension, whether it is to be treated as periodic.
        */
-      FsGrid(std::array<int32_t,3> globalSize, MPI_Comm parent_comm, std::array<int,3> isPeriodic)
+      FsGrid(std::array<int32_t,3> globalSize, MPI_Comm parent_comm, std::array<bool,3> isPeriodic)
             : globalSize(globalSize) {
-
          int status;
          int size;
+
          status = MPI_Comm_size(parent_comm, &size);
 
          // Heuristically choose a good domain decomposition for our field size
          computeDomainDecomposition(globalSize, size, ntasks);
-
+         
+         //set private array
          periodic = isPeriodic;
-
+         //set temporary int array for MPI_Cart_create
+         std::array<int, 3> isPeriodicInt;
+         for(int i; i < isPeriodic.size(); i++) {
+            isPeriodicInt[i] = (int)isPeriodic[i];
+         }  
+         
          // Create cartesian communicator
-         status = MPI_Cart_create(parent_comm, 3, ntasks.data(), isPeriodic.data(), 0, &comm3d);
+         status = MPI_Cart_create(parent_comm, 3, ntasks.data(), isPeriodicInt.data(), 0, &comm3d);
          if(status != MPI_SUCCESS) {
             std::cerr << "Creating cartesian communicatior failed when attempting to create FsGrid!" << std::endl;
             return;
