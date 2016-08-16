@@ -320,10 +320,10 @@ template <typename T, int stencil> class FsGrid {
          // Find the index in the task grid this Cell belongs to
          std::array<int, 3> taskIndex;
          for(int i=0; i<3; i++) {
-            int n_per_task = globalSize[i]/ntasks[i];
-            int remainder = globalSize[i]%ntasks[i];
+            int n_per_task = globalSize[i] / ntasks[i];
+            int remainder = globalSize[i] % ntasks[i];
 
-            if(cell[i] < remainder*(n_per_task+1)) {
+            if(cell[i] < remainder * (n_per_task+1)) {
                taskIndex[i] = cell[i] / (n_per_task + 1);
             } else {
                taskIndex[i] = remainder + (cell[i] - remainder*(n_per_task+1)) / n_per_task;
@@ -344,8 +344,10 @@ template <typename T, int stencil> class FsGrid {
 
          // Determine localID of that cell within the target task
          std::array<int, 3> thatTasksStart;
+         std::array<int, 3> thatTaskStorageSize;
          for(int i=0; i<3; i++) {
             thatTasksStart[i] = calcLocalStart(globalSize[i], ntasks[i], taskIndex[i]);
+            thatTaskStorageSize[i] = calcLocalSize(globalSize[i], ntasks[i], taskIndex[i]) + 2 * stencil;
          }
 
          retVal.second = 0;
@@ -356,10 +358,10 @@ template <typename T, int stencil> class FsGrid {
                retVal.second += 0;
             } else {
                retVal.second += stride*(cell[i] - thatTasksStart[i] + stencil);
-               stride *= storageSize[i];
+               stride *= thatTaskStorageSize[i];
             }
          }
-
+         
          return retVal;
       }
 
@@ -449,6 +451,7 @@ template <typename T, int stencil> class FsGrid {
        */
       void finishGridCoupling() {
          MPI_Waitall(numRequests, requests.data(), MPI_STATUSES_IGNORE);
+         numRequests=0;
       }
 
       /*! Prepare for transfer of grid cell data into this grid. 
