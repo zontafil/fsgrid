@@ -32,7 +32,7 @@ int main(int argc, char** argv) {
 
    // Create a 8×8 Testgrid
    std::array<int32_t, 3> globalSize{20,20,1};
-   std::array<int, 3> isPeriodic{false,false,true};
+   std::array<bool, 3> isPeriodic{false,false,true};
    {
       FsGrid<int,1> testGrid(globalSize, MPI_COMM_WORLD, isPeriodic);
 /*
@@ -136,7 +136,7 @@ int main(int argc, char** argv) {
             for(int x=0; x<globalSize[0]; x++) {
                fillData[y*globalSize[0] + x] = x*y;
 
-               testGrid.transferDataIn(y*globalSize[0]+x,fillData[y*globalSize[0]+x]);
+               testGrid.transferDataIn(y*globalSize[0]+x,&fillData[y*globalSize[0]+x]);
             }
          }
       } else {
@@ -170,7 +170,7 @@ int main(int argc, char** argv) {
          testGrid.setupForTransferOut(globalSize[0]*globalSize[1]);
          for(int y=0; y<globalSize[1]; y++) {
             for(int x=0; x<globalSize[0]; x++) {
-               testGrid.transferDataOut(y*globalSize[0]+x,returnedData[y*globalSize[0]+x]);
+               testGrid.transferDataOut(y*globalSize[0]+x,&returnedData[y*globalSize[0]+x]);
             }
          }
       } else {

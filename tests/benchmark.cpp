@@ -21,7 +21,7 @@
   along with fsgrid.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-template<class T, int stencil> void timeit(std::array<int32_t, 3> globalSize, std::array<int32_t, 3> isPeriodic, int iterations){
+template<class T, int stencil> void timeit(std::array<int32_t, 3> globalSize, std::array<bool, 3> isPeriodic, int iterations){
    double t1,t2;   
    FsGrid<T ,stencil> testGrid(globalSize, MPI_COMM_WORLD, isPeriodic);
    int rank,size;
@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
 
    // Create a 8×8 Testgrid
    std::array<int32_t, 3> globalSize{2000,1000,1};
-   std::array<int, 3> isPeriodic{false,false,true};
+   std::array<bool, 3> isPeriodic{false,false,true};
 
    const int iterations = 200;
 
