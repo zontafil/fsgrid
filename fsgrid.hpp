@@ -57,7 +57,7 @@ template <typename T, int stencil> class FsGrid {
          periodic = isPeriodic;
          //set temporary int array for MPI_Cart_create
          std::array<int, 3> isPeriodicInt;
-         for(int i; i < isPeriodic.size(); i++) {
+         for(int i=0; i < isPeriodic.size(); i++) {
             isPeriodicInt[i] = (int)isPeriodic[i];
          }  
          
