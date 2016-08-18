@@ -660,7 +660,7 @@ template <typename T, int stencil> class FsGrid {
             }
          } else {
             if(y < -stencil || y > localSize[1] + stencil) {
-               std::cerr << "y = " << x << " is outside of [ " << -stencil << 
+               std::cerr << "y = " << y << " is outside of [ " << -stencil <<
                   ", " << localSize[1] + stencil << "]!" << std::endl;
                inside = false;
             }
@@ -674,7 +674,7 @@ template <typename T, int stencil> class FsGrid {
          } else {
             if(z < -stencil || z > localSize[2] + stencil) {
                inside = false;
-               std::cerr << "z = " << x << " is outside of [ " << -stencil << 
+               std::cerr << "z = " << z << " is outside of [ " << -stencil <<
                   ", " << localSize[2] + stencil << "]!" << std::endl;
             }
          }
