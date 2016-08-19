@@ -541,7 +541,7 @@ template <typename T, int stencil> class FsGrid {
          // Build the MPI Irecv request for this cell
          int status;
          assert(numRequests < requests.size());
-         status = MPI_Irecv(&target, sizeof(T), MPI_BYTE, TaskLid.first, TaskLid.second, comm3d,
+         status = MPI_Irecv(target, sizeof(T), MPI_BYTE, TaskLid.first, TaskLid.second, comm3d,
                &requests[numRequests++]);
          if(status != MPI_SUCCESS) {
             std::cerr << "Error setting up MPI Isend in FsGrid::transferDataOut" << std::endl;
