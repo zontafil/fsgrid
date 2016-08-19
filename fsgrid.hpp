@@ -414,7 +414,7 @@ template <typename T, int stencil> class FsGrid {
                for(int x=0; x<localSize[0]; x++) {
                   // Calculate LocalID for this cell
                   LocalID thisCell = LocalIDForCoords(x,y,z);
-                  assert(numRequests < requests.size() - 1);
+                  assert(numRequests < requests.size());
                   status = MPI_Irecv(&externalRank[thisCell], 1, MPI_INT, MPI_ANY_SOURCE, thisCell, comm3d,
                         &requests[numRequests++]);
                   if(status != MPI_SUCCESS) {
@@ -442,7 +442,7 @@ template <typename T, int stencil> class FsGrid {
 
          // Build the MPI Isend request for this cell
          int status;
-         assert(numRequests < requests.size() - 1);
+         assert(numRequests < requests.size());
          status = MPI_Isend(&rank, 1, MPI_INT, TaskLid.first, TaskLid.second, comm3d,
                &requests[numRequests++]);
          if(status != MPI_SUCCESS) {
@@ -476,7 +476,7 @@ template <typename T, int stencil> class FsGrid {
                for(int x=0; x<localSize[0]; x++) {
                   // Calculate LocalID for this cell
                   LocalID thisCell = LocalIDForCoords(x,y,z);
-                  assert(numRequests < requests.size() - 1);
+                  assert(numRequests < requests.size());
                   status = MPI_Irecv(get(thisCell), sizeof(T), MPI_BYTE, externalRank[thisCell], thisCell, comm3d,
                         &requests[numRequests++]);
                   if(status != MPI_SUCCESS) {
@@ -499,7 +499,7 @@ template <typename T, int stencil> class FsGrid {
 
          // Build the MPI Isend request for this cell
          int status;
-         assert(numRequests < requests.size() - 1);
+         assert(numRequests < requests.size());
          status = MPI_Isend(value, sizeof(T), MPI_BYTE, TaskLid.first, TaskLid.second, comm3d,
                &requests[numRequests++]);
          if(status != MPI_SUCCESS) {
@@ -540,7 +540,7 @@ template <typename T, int stencil> class FsGrid {
 
          // Build the MPI Irecv request for this cell
          int status;
-         assert(numRequests < requests.size() - 1);
+         assert(numRequests < requests.size());
          status = MPI_Irecv(&target, sizeof(T), MPI_BYTE, TaskLid.first, TaskLid.second, comm3d,
                &requests[numRequests++]);
          if(status != MPI_SUCCESS) {
@@ -560,7 +560,7 @@ template <typename T, int stencil> class FsGrid {
                for(int x=0; x<localSize[0]; x++) {
                   // Calculate LocalID for this cell
                   LocalID thisCell = LocalIDForCoords(x,y,z);
-                  assert(numRequests < requests.size() - 1);
+                  assert(numRequests < requests.size());
                   status = MPI_Isend(get(thisCell), sizeof(T), MPI_BYTE, externalRank[thisCell], thisCell, comm3d,
                         &requests[numRequests++]);
                   if(status != MPI_SUCCESS) {
