@@ -25,6 +25,7 @@
 #include <iostream>
 #include <limits>
 #include <stdint.h>
+#include <cassert>
 
 /*! Simple cartesian, non-loadbalancing MPI Grid for use with the fieldsolver
  *
@@ -61,7 +62,8 @@ template <typename T, int stencil> class FsGrid {
             isPeriodicInt[i] = (int)isPeriodic[i];
          }  
          
-         // Create cartesian communicator
+         // Create cartesian communicator. Note, that reorder is false so
+         // ranks match the ones in parent_comm
          status = MPI_Cart_create(parent_comm, 3, ntasks.data(), isPeriodicInt.data(), 0, &comm3d);
          if(status != MPI_SUCCESS) {
             std::cerr << "Creating cartesian communicatior failed when attempting to create FsGrid!" << std::endl;
@@ -412,6 +414,7 @@ template <typename T, int stencil> class FsGrid {
                for(int x=0; x<localSize[0]; x++) {
                   // Calculate LocalID for this cell
                   LocalID thisCell = LocalIDForCoords(x,y,z);
+                  assert(numRequests < requests.size() - 1);
                   status = MPI_Irecv(&externalRank[thisCell], 1, MPI_INT, MPI_ANY_SOURCE, thisCell, comm3d,
                         &requests[numRequests++]);
                   if(status != MPI_SUCCESS) {
@@ -439,6 +442,7 @@ template <typename T, int stencil> class FsGrid {
 
          // Build the MPI Isend request for this cell
          int status;
+         assert(numRequests < requests.size() - 1);
          status = MPI_Isend(&rank, 1, MPI_INT, TaskLid.first, TaskLid.second, comm3d,
                &requests[numRequests++]);
          if(status != MPI_SUCCESS) {
@@ -450,6 +454,7 @@ template <typename T, int stencil> class FsGrid {
        * Basically only does a MPI_Waitall for all requests.
        */
       void finishGridCoupling() {
+         assert(numRequests == requests.size());
          MPI_Waitall(numRequests, requests.data(), MPI_STATUSES_IGNORE);
          numRequests=0;
       }
@@ -471,6 +476,7 @@ template <typename T, int stencil> class FsGrid {
                for(int x=0; x<localSize[0]; x++) {
                   // Calculate LocalID for this cell
                   LocalID thisCell = LocalIDForCoords(x,y,z);
+                  assert(numRequests < requests.size() - 1);
                   status = MPI_Irecv(get(thisCell), sizeof(T), MPI_BYTE, externalRank[thisCell], thisCell, comm3d,
                         &requests[numRequests++]);
                   if(status != MPI_SUCCESS) {
@@ -493,6 +499,7 @@ template <typename T, int stencil> class FsGrid {
 
          // Build the MPI Isend request for this cell
          int status;
+         assert(numRequests < requests.size() - 1);
          status = MPI_Isend(value, sizeof(T), MPI_BYTE, TaskLid.first, TaskLid.second, comm3d,
                &requests[numRequests++]);
          if(status != MPI_SUCCESS) {
@@ -503,7 +510,10 @@ template <typename T, int stencil> class FsGrid {
        * Basically only does a MPI_Waitall for all requests.
        */
       void finishTransfersIn() {
+         assert(numRequests == requests.size());
          MPI_Waitall(numRequests,requests.data(),MPI_STATUSES_IGNORE);
+         numRequests = 0;
+         
       }
 
 
@@ -530,6 +540,7 @@ template <typename T, int stencil> class FsGrid {
 
          // Build the MPI Irecv request for this cell
          int status;
+         assert(numRequests < requests.size() - 1);
          status = MPI_Irecv(&target, sizeof(T), MPI_BYTE, TaskLid.first, TaskLid.second, comm3d,
                &requests[numRequests++]);
          if(status != MPI_SUCCESS) {
@@ -549,6 +560,7 @@ template <typename T, int stencil> class FsGrid {
                for(int x=0; x<localSize[0]; x++) {
                   // Calculate LocalID for this cell
                   LocalID thisCell = LocalIDForCoords(x,y,z);
+                  assert(numRequests < requests.size() - 1);
                   status = MPI_Isend(get(thisCell), sizeof(T), MPI_BYTE, externalRank[thisCell], thisCell, comm3d,
                         &requests[numRequests++]);
                   if(status != MPI_SUCCESS) {
@@ -557,8 +569,9 @@ template <typename T, int stencil> class FsGrid {
                }
             }
          }
-
+         assert(numRequests == requests.size());
          MPI_Waitall(numRequests,requests.data(),MPI_STATUSES_IGNORE);
+         numRequests = 0;
       }
 
       /*! Perform ghost cell communication.
@@ -709,7 +722,7 @@ template <typename T, int stencil> class FsGrid {
       MPI_Comm comm3d;
       int rank; //!< This task's rank in the communicator
       std::vector<MPI_Request> requests;
-      int numRequests;
+      uint numRequests;
 
       std::vector<int> externalRank; //!< MPI rank that each cell is being communicated to externally
 
@@ -745,6 +758,9 @@ template <typename T, int stencil> class FsGrid {
 
          // Transform globalID to global cell coordinate
          std::array<int, 3> cell;
+
+         assert(id >= 0);
+         assert(id < globalSize[0] * globalSize[1] * globalSize[2]);
 
          int stride=1;
          for(int i=0; i<3; i++) {
