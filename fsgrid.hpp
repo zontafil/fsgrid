@@ -713,6 +713,42 @@ template <typename T, int stencil> class FsGrid {
        */
       double DX,DY,DZ;
 
+      /*! Debugging output helper function. Allows for nicely formatted printing
+       * of grid contents. Since the grid data format is varying, the actual
+       * printing should be done in a lambda passed to this function. Example usage
+       * to plot |B|:
+       *
+       * perBGrid.debugOutput([](const std::array<Real, fsgrids::bfield::N_BFIELD>& a)->void{
+       *     cerr << sqrt(a[0]*a[0]+a[1]*a[1]+a[2]*a[2]) << ", ";
+       * });
+       *
+       * \param func Function pointer (or lambda) which is called with a cell reference,
+       * in order. Use std::cerr in it to print desired value.
+       */
+      void debugOutput(void (func)(const T&)) {
+         int xmin=0,xmax=1;
+         int ymin=0,ymax=1;
+         int zmin=0,zmax=1;
+         if(localSize[0] > 1) {
+            xmin = -stencil; xmax = localSize[0]+stencil;
+         }
+         if(localSize[1] > 1) {
+            ymin = -stencil; ymax = localSize[1]+stencil;
+         }
+         if(localSize[2] > 1) {
+            zmin = -stencil; zmax = localSize[2]+stencil;
+         }
+         for(int z=zmin; z<zmax; z++) {
+            for(int y=ymin; y<ymax; y++) {
+               for(int x=xmin; x<xmax; x++) {
+                  func(*get(x,y,z));
+               }
+               std::cerr << std::endl;
+            }
+            std::cerr << " - - - - - - - - " << std::endl;
+         }
+      }
+
    private:
       //! MPI Cartesian communicator used in this grid
       MPI_Comm comm3d;
