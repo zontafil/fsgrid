@@ -405,8 +405,9 @@ template <typename T, int stencil> class FsGrid {
        */
       void setupForGridCoupling(int cellsToCouple) {
          int status;
-         // Make sure we have sufficient buffer space to store our mpi requests
-         requests.resize(localSize[0]*localSize[1]*localSize[2] + cellsToCouple);
+         // Make sure we have sufficient buffer space to store our mpi
+         // requests. Here only for receives, sends are done with blocking routine.
+         requests.resize(localSize[0]*localSize[1]*localSize[2]);
          numRequests=0;
 
          for(int z=0; z<localSize[2]; z++) {
@@ -433,18 +434,13 @@ template <typename T, int stencil> class FsGrid {
        * balancing step)
        *
        * \param id Global cell ID to be addressed
-       * \iparam rank
+       * \iparam cellRank Rank that owns the cell in the other external grid.
        */
-      void setGridCoupling(GlobalID id, int rank) {
-
+      void setGridCoupling(GlobalID id, int cellRank) {
          // Determine Task and localID that this cell belongs to
          std::pair<int,LocalID> TaskLid = getTaskForGlobalID(id);
-
-         // Build the MPI Isend request for this cell
          int status;
-         assert(numRequests < requests.size());
-         status = MPI_Isend(&rank, 1, MPI_INT, TaskLid.first, TaskLid.second, comm3d,
-               &requests[numRequests++]);
+         status = MPI_Send(&cellRank, 1, MPI_INT, TaskLid.first, TaskLid.second, comm3d);
          if(status != MPI_SUCCESS) {
             std::cerr << "Error setting up MPI Isend in FsGrid::setGridCoupling" << std::endl;
          }
