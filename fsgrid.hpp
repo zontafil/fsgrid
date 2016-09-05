@@ -754,6 +754,11 @@ template <typename T, int stencil> class FsGrid {
          }
       }
 
+      /*! Get the rank of this CPU in the FsGrid communicator */
+      int getRank() {
+        return rank;
+      }
+
    private:
       //! MPI Cartesian communicator used in this grid
       MPI_Comm comm3d;
