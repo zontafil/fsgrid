@@ -410,6 +410,11 @@ template <typename T, int stencil> class FsGrid {
          requests.resize(localSize[0]*localSize[1]*localSize[2]);
          numRequests=0;
 
+         // If previous coupling information was present, remove it.
+         for(uint i=0; i<externalRank.size(); i++) {
+            externalRank[i] = MPI_PROC_NULL;
+         }
+
          for(int z=0; z<localSize[2]; z++) {
             for(int y=0; y<localSize[1]; y++) {
                for(int x=0; x<localSize[0]; x++) {
