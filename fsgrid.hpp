@@ -458,6 +458,7 @@ template <typename T, int stencil> class FsGrid {
          assert(numRequests == requests.size());
          MPI_Waitall(numRequests, requests.data(), MPI_STATUSES_IGNORE);
          numRequests=0;
+         MPI_Barrier(comm3d);
       }
 
       /*! Prepare for transfer of grid cell data into this grid. 
