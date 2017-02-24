@@ -299,9 +299,10 @@ template <typename T, int stencil> class FsGrid {
 
       }
 
-      /*! Destructor, cleans up the cartesian communicator
+      /*! Finalize instead of destructor, as the MPI calls fail after the main program called MPI_Finalize().
+       *  Cleans up the cartesian communicator
        */
-      ~FsGrid() {
+      void finalize() {
          for(int i=0;i<27;i++){
             if(neighbourReceiveType[i] != MPI_DATATYPE_NULL)
                MPI_Type_free(&(neighbourReceiveType[i]));
