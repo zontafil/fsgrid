@@ -761,6 +761,13 @@ template <typename T, int stencil> class FsGrid {
         return rank;
       }
 
+      /*! Perform an MPI_Allreduce with this grid's internal communicator
+       * Function syntax is identical to MPI_Allreduce, except the final (communicator
+       * argument will not be needed) */
+      int Allreduce(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op) {
+         return MPI_Allreduce(sendbuf, recvbuf, cont, datatype, op, comm3d);
+      }
+
    private:
       //! MPI Cartesian communicator used in this grid
       MPI_Comm comm3d;
@@ -817,7 +824,7 @@ template <typename T, int stencil> class FsGrid {
 
       //! Helper function to optimize decomposition of this grid over the given number of tasks
 
-   
+
       void computeDomainDecomposition(const std::array<int, 3>& GlobalSize, int nProcs, std::array<int,3>& processDomainDecomposition) {
          std::array<double, 3> systemDim;
          std::array<double, 3 > processBox;
@@ -841,7 +848,7 @@ template <typename T, int stencil> class FsGrid {
                      (i > 1 ? processBox[1] * processBox[2]: 0) +
                      (j > 1 ? processBox[0] * processBox[2]: 0) +
                      (k > 1 ? processBox[0] * processBox[1]: 0);
-	
+
                   if(value < optimValue ){
                      optimValue = value;
                      processDomainDecomposition[0] = i;
