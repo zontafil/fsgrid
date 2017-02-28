@@ -764,8 +764,8 @@ template <typename T, int stencil> class FsGrid {
       /*! Perform an MPI_Allreduce with this grid's internal communicator
        * Function syntax is identical to MPI_Allreduce, except the final (communicator
        * argument will not be needed) */
-      int Allreduce(const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op) {
-         return MPI_Allreduce(sendbuf, recvbuf, cont, datatype, op, comm3d);
+      int Allreduce(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op) {
+         return MPI_Allreduce(sendbuf, recvbuf, count, datatype, op, comm3d);
       }
 
    private:
