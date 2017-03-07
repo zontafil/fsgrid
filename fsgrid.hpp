@@ -657,15 +657,23 @@ template <typename T, int stencil> class FsGrid {
          // Santiy-Check that the requested cell is actually inside our domain
          // TODO: ugh, this is ugly.
          bool inside=true;
+         // Keep track which neighbour this cell actually belongs to (13 = ourself)
+         int isInNeighbourDomain=13;
          if(localSize[0] <= 1 && !periodic[0]) {
             if(x != 0) {
                std::cerr << "x != 0 despite non-periodic x-axis with only one cell." << std::endl;
                inside = false;
             }
          } else {
-            if(x < -stencil || x > localSize[0] + stencil) {
+            if(x < 0) {
+              isInNeighbourDomain -= 9;
+            }
+            if(x >= localSize[0]) {
+              isInNeighbourDomain += 9;
+            }
+            if(x < -stencil || x >= localSize[0] + stencil) {
                std::cerr << "x = " << x << " is outside of [ " << -stencil << 
-                  ", " << localSize[0] + stencil << "]!" << std::endl;
+                  ", " << localSize[0] + stencil << "[!" << std::endl;
                inside = false;
             }
          }
@@ -676,9 +684,15 @@ template <typename T, int stencil> class FsGrid {
                inside = false;
             }
          } else {
-            if(y < -stencil || y > localSize[1] + stencil) {
+            if(y < 0) {
+              isInNeighbourDomain -= 3;
+            }
+            if(y >= localSize[1]) {
+              isInNeighbourDomain += 3;
+            }
+            if(y < -stencil || y >= localSize[1] + stencil) {
                std::cerr << "y = " << y << " is outside of [ " << -stencil <<
-                  ", " << localSize[1] + stencil << "]!" << std::endl;
+                  ", " << localSize[1] + stencil << "[!" << std::endl;
                inside = false;
             }
          }
@@ -689,13 +703,27 @@ template <typename T, int stencil> class FsGrid {
                inside = false;
             }
          } else {
-            if(z < -stencil || z > localSize[2] + stencil) {
+            if(z < 0) {
+              isInNeighbourDomain -= 1;
+            }
+            if(z >= localSize[2]) {
+              isInNeighbourDomain += 1;
+            }
+            if(z < -stencil || z >= localSize[2] + stencil) {
                inside = false;
                std::cerr << "z = " << z << " is outside of [ " << -stencil <<
-                  ", " << localSize[2] + stencil << "]!" << std::endl;
+                  ", " << localSize[2] + stencil << "[!" << std::endl;
             }
          }
 
+         // Check if the corresponding neighbour exists
+         if(isInNeighbourDomain != 13) {
+            if(neighbour[isInNeighbourDomain]==MPI_PROC_NULL) {
+              // Neighbour doesn't exist, we must be an outer boundary cell
+              // (or something is quite wrong)
+              return NULL;
+            }
+         }
          if(!inside) {
             std::cerr << "Out-of bounds access in FsGrid::get! Expect weirdness." << std::endl;
             return NULL;
