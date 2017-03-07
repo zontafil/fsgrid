@@ -163,9 +163,10 @@ template <typename T, int stencil> class FsGrid {
             localStart[i] = calcLocalStart(globalSize[i],ntasks[i], taskPosition[i]);
          }
 
-         //std::cerr << "Rank " << rank << " here, my space starts at [" << localStart[0] << ", " << localStart[1] << ", "
-         //   << localStart[2] << "] and ends at [" << (localStart[0] + localSize[0]) << ", " <<
-         //   (localStart[1]+localSize[1]) << ", " << (localStart[2]+localSize[2]) << "]" << std::endl;
+         if(localSize[0] == 0 || localSize[1] == 0 || localSize[2] == 0) {
+            std::cerr << "FSGrid local space is zero cells in size on Rank " <<
+               rank << "! Simulation domain probably does not fit with task number." << std::endl;
+         }
 
          // Allocate local storage array
          size_t totalStorageSize=1;
