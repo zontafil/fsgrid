@@ -654,23 +654,44 @@ template <typename T, int stencil> class FsGrid {
        */
       T* get(int x, int y, int z) {
 
-         // Santiy-Check that the requested cell is actually inside our domain
-         // TODO: ugh, this is ugly.
-         bool inside=true;
          // Keep track which neighbour this cell actually belongs to (13 = ourself)
          int isInNeighbourDomain=13;
+         int coord_shift[3] = {0,0,0};
+         if(x < 0) {
+            isInNeighbourDomain -= 9;
+            coord_shift[0] = 1;
+         }
+         if(x >= localSize[0]) {
+            isInNeighbourDomain += 9;
+            coord_shift[0] = -1;
+         }
+         if(y < 0) {
+            isInNeighbourDomain -= 3;
+            coord_shift[1] = 1;
+         }
+         if(y >= localSize[1]) {
+            isInNeighbourDomain += 3;
+            coord_shift[1] = -1;
+         }
+         if(z < 0) {
+            isInNeighbourDomain -= 1;
+            coord_shift[2] = 1;
+         }
+         if(z >= localSize[2]) {
+            isInNeighbourDomain += 1;
+            coord_shift[2] = -1;
+         }
+
+         // Santiy-Check that the requested cell is actually inside our domain
+         // TODO: ugh, this is ugly.
+#ifdef FSGRID_DEBUG
+         bool inside=true;
          if(localSize[0] <= 1 && !periodic[0]) {
             if(x != 0) {
                std::cerr << "x != 0 despite non-periodic x-axis with only one cell." << std::endl;
                inside = false;
             }
          } else {
-            if(x < 0) {
-              isInNeighbourDomain -= 9;
-            }
-            if(x >= localSize[0]) {
-              isInNeighbourDomain += 9;
-            }
             if(x < -stencil || x >= localSize[0] + stencil) {
                std::cerr << "x = " << x << " is outside of [ " << -stencil << 
                   ", " << localSize[0] + stencil << "[!" << std::endl;
@@ -684,12 +705,6 @@ template <typename T, int stencil> class FsGrid {
                inside = false;
             }
          } else {
-            if(y < 0) {
-              isInNeighbourDomain -= 3;
-            }
-            if(y >= localSize[1]) {
-              isInNeighbourDomain += 3;
-            }
             if(y < -stencil || y >= localSize[1] + stencil) {
                std::cerr << "y = " << y << " is outside of [ " << -stencil <<
                   ", " << localSize[1] + stencil << "[!" << std::endl;
@@ -703,32 +718,35 @@ template <typename T, int stencil> class FsGrid {
                inside = false;
             }
          } else {
-            if(z < 0) {
-              isInNeighbourDomain -= 1;
-            }
-            if(z >= localSize[2]) {
-              isInNeighbourDomain += 1;
-            }
             if(z < -stencil || z >= localSize[2] + stencil) {
                inside = false;
                std::cerr << "z = " << z << " is outside of [ " << -stencil <<
                   ", " << localSize[2] + stencil << "[!" << std::endl;
             }
          }
-
-         // Check if the corresponding neighbour exists
-         if(isInNeighbourDomain != 13) {
-            if(neighbour[isInNeighbourDomain]==MPI_PROC_NULL) {
-              // Neighbour doesn't exist, we must be an outer boundary cell
-              // (or something is quite wrong)
-              return NULL;
-            }
-         }
          if(!inside) {
             std::cerr << "Out-of bounds access in FsGrid::get! Expect weirdness." << std::endl;
             return NULL;
          }
-         
+#endif // FSGRID_DEBUG
+
+         if(isInNeighbourDomain != 13) {
+
+            // Check if the corresponding neighbour exists
+            if(neighbour[isInNeighbourDomain]==MPI_PROC_NULL) {
+               // Neighbour doesn't exist, we must be an outer boundary cell
+               // (or something is quite wrong)
+               return NULL;
+
+            } else if(neighbour[isInNeighbourDomain] == rank) {
+               // For periodic boundaries, where the neighbour is actually ourself,
+               // return our own actual cell instead of the ghost
+               x += coord_shift[0] * localSize[0];
+               y += coord_shift[1] * localSize[1];
+               z += coord_shift[2] * localSize[2];
+            }
+            // Otherwise we return the ghost cell
+         }
          LocalID index = LocalIDForCoords(x,y,z);
 
          return &data[index];
