@@ -67,7 +67,7 @@ template <typename T, int stencil> class FsGrid {
          status = MPI_Cart_create(parent_comm, 3, ntasks.data(), isPeriodicInt.data(), 0, &comm3d);
          if(status != MPI_SUCCESS) {
             std::cerr << "Creating cartesian communicatior failed when attempting to create FsGrid!" << std::endl;
-            return;
+            throw std::runtime_error("FSGrid communicator setup failed");
          }
 
          status = MPI_Comm_rank(comm3d, &rank);
@@ -163,9 +163,12 @@ template <typename T, int stencil> class FsGrid {
             localStart[i] = calcLocalStart(globalSize[i],ntasks[i], taskPosition[i]);
          }
 
-         if(localSize[0] == 0 || localSize[1] == 0 || localSize[2] == 0) {
-            std::cerr << "FSGrid local space is zero cells in size on Rank " <<
-               rank << "! Simulation domain probably does not fit with task number." << std::endl;
+         if(  localSize[0] == 0 || (globalSize[0] > stencil && localSize[0] < stencil)
+           || localSize[1] == 0 || (globalSize[1] > stencil && localSize[1] < stencil)
+           || localSize[2] == 0 || (globalSize[2] > stencil && localSize[2] < stencil)) {
+            std::cerr << "FSGrid space partitioning leads to a space that is too small on Rank " << rank << "." <<std::endl;
+            std::cerr << "Please run with a different number of Tasks, so that space is better divisible." <<std::endl;
+            throw std::runtime_error("FSGrid too small domains");
          }
 
          // Allocate local storage array
@@ -904,6 +907,12 @@ template <typename T, int stencil> class FsGrid {
                   }
                }
             }
+         }
+
+         if(optimValue == std::numeric_limits<double>::max() ||
+               processDomainDecomposition[0] * processDomainDecomposition[1] * processDomainDecomposition[2] != nProcs) {
+            std::cerr << "FSGrid domain decomposition failed, are you running on a prime number of tasks?" << std::endl;
+            throw std::runtime_error("FSGrid computeDomainDecomposition failed");
          }
       }
    
