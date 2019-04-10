@@ -765,10 +765,27 @@ template <typename T, int stencil> class FsGrid {
          return &data[id];
       }
 
-      /*! Physical grid spacing.
+      /*! Physical grid spacing and physical coordinate space start.
        * TODO: Should this be private and have accesor-functions?
        */
       double DX,DY,DZ;
+      std::array<double,3> physicalGlobalStart;
+
+      /*! Get the physical coordinates in the global simulation space for
+       * the given cell.
+       *
+       * \param x local x-Coordinate, in cells
+       * \param y local y-Coordinate, in cells
+       * \param z local z-Coordinate, in cells
+       */
+      std::array<double, 3>&& getPhysicalCoords(int x, int y, int z) {
+         std::array<double, 3> coords;
+         coords[0] = physicalGlobalStart[0] + (localStart[0]+x)*DX;
+         coords[1] = physicalGlobalStart[1] + (localStart[1]+x)*DY;
+         coords[2] = physicalGlobalStart[2] + (localStart[2]+x)*DZ;
+
+         return coords;
+      }
 
       /*! Debugging output helper function. Allows for nicely formatted printing
        * of grid contents. Since the grid data format is varying, the actual
