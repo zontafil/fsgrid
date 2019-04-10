@@ -778,7 +778,7 @@ template <typename T, int stencil> class FsGrid {
        * \param y local y-Coordinate, in cells
        * \param z local z-Coordinate, in cells
        */
-      std::array<double, 3>&& getPhysicalCoords(int x, int y, int z) {
+      std::array<double, 3> getPhysicalCoords(int x, int y, int z) {
          std::array<double, 3> coords;
          coords[0] = physicalGlobalStart[0] + (localStart[0]+x)*DX;
          coords[1] = physicalGlobalStart[1] + (localStart[1]+x)*DY;
