@@ -540,9 +540,9 @@ template <typename T, int stencil> class FsGrid {
        *
        * \param cellsToSend How many cells are going to be sent by this task
        */
-      void setupForTransferOut(int cellsToRecieve) {
+      void setupForTransferOut(int cellsToReceive) {
          // Make sure we have sufficient buffer space to store our mpi requests
-         requests.resize(localSize[0]*localSize[1]*localSize[2] + cellsToRecieve);
+         requests.resize(localSize[0]*localSize[1]*localSize[2] + cellsToReceive);
          numRequests=0;
       }
 
