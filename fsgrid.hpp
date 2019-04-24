@@ -387,9 +387,7 @@ template <typename T, int stencil> class FsGrid {
        * \param z The cell's task-local z coordinate
        */
       GlobalID GlobalIDForCoords(int x, int y, int z) {
-         return globalSize[0]*(x+localStart[0])
-            + globalSize[1]*(y+localStart[1])
-            + globalSize[2]*(z+localStart[2]);
+         return x + localStart[0] + globalSize[0] * (y + localStart[1]) + globalSize[0] * globalSize[1] * (z + localStart[2]);
       }
       /*! Determine the cell's LocalID from its local x,y,z coordinates
        * \param x The cell's task-local x coordinate
