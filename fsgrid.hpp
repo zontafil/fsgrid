@@ -891,6 +891,11 @@ template <typename T, int stencil> class FsGrid {
             vlsvWriter.writeArray("MESH_NODE_CRDS_Z", xmlAttributes, 0, 1, zNodeCoordinates.data());
          }
 
+         // Dummy ghost info
+         int dummyghost=0;
+         vlsvWriter.writeArray("MESH_GHOST_DOMAINS", xmlAttributes, 0, 1, &dummyghost);
+         vlsvWriter.writeArray("MESH_GHOST_LOCALIDS", xmlAttributes, 0, 1, &dummyghost);
+
          // Write cell "globalID" numbers, which are just the global array indices.
          std::vector<uint64_t> globalIds(localSize[0]*localSize[1]*localSize[2]);
          int i=0;
@@ -937,7 +942,7 @@ template <typename T, int stencil> class FsGrid {
             }
          }
          std::cerr << "Writing VARIABLE " << variableName << std::endl;
-         if(vlsvWriter.writeArray("VARIABLE", attribs, "double", storageSize, 1, sizeof(double), reinterpret_cast<const char*>(varBuffer.data())) == false) {
+         if(vlsvWriter.writeArray("VARIABLE", attribs, "float", storageSize, 1, sizeof(double), reinterpret_cast<const char*>(varBuffer.data())) == false) {
             std::cerr << "(FSGRID) ERROR: vlsvOutput of variable " << variableName << " failed!" << std::endl;
          }
       }
