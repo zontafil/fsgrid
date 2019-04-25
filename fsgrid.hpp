@@ -921,6 +921,24 @@ template <typename T, int stencil> class FsGrid {
          std::array<uint32_t,2> meshDomainSize({globalIds.size(), 0});
          std::cerr << "Writing MESH_DOMAIN_SIZES" << std::endl;
          vlsvWriter.writeArray("MESH_DOMAIN_SIZES", xmlAttributes, 1, 2, &meshDomainSize[0]);
+
+         // Write parameters for analysis scripts
+         double xmax = physicalGlobalStart[0] + DX * globalSize[0];
+         double ymax = physicalGlobalStart[1] + DY * globalSize[1];
+         double zmax = physicalGlobalStart[2] + DZ * globalSize[2];
+         vlsvWriter.writeParameter("xmin", &physicalGlobalStart[0] );
+         vlsvWriter.writeParameter("xmax", &xmax);
+         vlsvWriter.writeParameter("ymin", &physicalGlobalStart[1] );
+         vlsvWriter.writeParameter("ymax", &ymax);
+         vlsvWriter.writeParameter("zmin", &physicalGlobalStart[2] );
+         vlsvWriter.writeParameter("zmax", &zmax);
+         vlsvWriter.writeParameter("xcells_ini", &globalSize[0]);
+         vlsvWriter.writeParameter("ycells_ini", &globalSize[1]);
+         vlsvWriter.writeParameter("zcells_ini", &globalSize[2]);
+
+         // Dummy time (TODO: replace by actual time)
+         double dummyTime = 0.0;
+         vlsvWriter.writeParameter("time", &dummyTime);
       }
 
       void vlsvOutputVariable(vlsv::Writer& vlsvWriter, std::function<double(T&)>& func, const std::string& meshName, const std::string& variableName) {
