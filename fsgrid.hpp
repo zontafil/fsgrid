@@ -844,7 +844,6 @@ template <typename T, int stencil> class FsGrid {
 
          std::map<std::string, std::string> xmlAttributes;
          xmlAttributes["mesh"] = meshName;
-         xmlAttributes["type"] = vlsv::mesh::STRING_UCD_MULTI;
 
          //The visit plugin expects MESH_BBOX as a keyword. We only write one
          //from the first rank.
@@ -909,13 +908,6 @@ template <typename T, int stencil> class FsGrid {
             }
          }
 
-         if(periodic[0]) { xmlAttributes["xperiodic"] = "yes"; } else { xmlAttributes["xperiodic"] = "no"; }
-         if(periodic[1]) { xmlAttributes["yperiodic"] = "yes"; } else { xmlAttributes["yperiodic"] = "no"; }
-         if(periodic[2]) { xmlAttributes["zperiodic"] = "yes"; } else { xmlAttributes["zperiodic"] = "no"; }
-         xmlAttributes["type"] = "multi_ucd";
-
-         std::cerr << "Writing MESH" << std::endl;
-         vlsvWriter.writeArray("MESH", xmlAttributes, globalIds.size(), 1, globalIds.data());
 
          // writeDomainSizes
          std::array<uint32_t,2> meshDomainSize({globalIds.size(), 0});
@@ -939,6 +931,17 @@ template <typename T, int stencil> class FsGrid {
          // Dummy time (TODO: replace by actual time)
          double dummyTime = 0.0;
          vlsvWriter.writeParameter("time", &dummyTime);
+
+         // Finally, write mesh object itself.
+         xmlAttributes.clear();
+         xmlAttributes["name"] = meshName;
+         xmlAttributes["type"] = vlsv::mesh::STRING_UCD_MULTI;
+         if(periodic[0]) { xmlAttributes["xperiodic"] = "yes"; } else { xmlAttributes["xperiodic"] = "no"; }
+         if(periodic[1]) { xmlAttributes["yperiodic"] = "yes"; } else { xmlAttributes["yperiodic"] = "no"; }
+         if(periodic[2]) { xmlAttributes["zperiodic"] = "yes"; } else { xmlAttributes["zperiodic"] = "no"; }
+
+         std::cerr << "Writing MESH" << std::endl;
+         vlsvWriter.writeArray("MESH", xmlAttributes, globalIds.size(), 1, globalIds.data());
       }
 
       void vlsvOutputVariable(vlsv::Writer& vlsvWriter, std::function<double(T&)>& func, const std::string& meshName, const std::string& variableName) {
