@@ -643,6 +643,12 @@ template <typename T, int stencil> class FsGrid {
          return localSize;
       }
 
+      /*! Get global size of the fsgrid domain
+       */
+      std::array<int32_t, 3>& getGlobalSize() {
+         return globalSize;
+      }
+
       /*! Calculate global cell position (XYZ in global cell space) from local cell coordinates.
        *
        * \param x x-Coordinate, in cells
@@ -949,7 +955,6 @@ template <typename T, int stencil> class FsGrid {
          attribs["mesh"]=meshName;
          attribs["name"]=variableName;
 
-         attribs["type"]=vlsv::mesh::STRING_UCD_MULTI;
 
          // Reserve a temporary output buffer
          size_t storageSize = localSize[0]*localSize[1]*localSize[2];
