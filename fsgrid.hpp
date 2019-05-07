@@ -640,6 +640,12 @@ template <typename T, int stencil> class FsGrid {
          return localSize;
       }
 
+      /*! Get global size of the fsgrid domain
+       */
+      std::array<int32_t, 3>& getGlobalSize() {
+         return globalSize;
+      }
+
       /*! Calculate global cell position (XYZ in global cell space) from local cell coordinates.
        *
        * \param x x-Coordinate, in cells
@@ -764,7 +770,7 @@ template <typename T, int stencil> class FsGrid {
       }
 
       T* get(LocalID id) {
-         if(id < 0 || id > data.size()) {
+         if(id < 0 || (unsigned int)id > data.size()) {
             std::cerr << "Out-of-bounds access in FsGrid::get!" << std::endl
                << "(LocalID = " << id << ", but storage space is " << data.size()
                << ". Expect weirdness." << std::endl;
