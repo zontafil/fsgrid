@@ -26,8 +26,6 @@
 #include <limits>
 #include <stdint.h>
 #include <cassert>
-#include <map>
-#include <functional>
 
 struct FsGridCouplingInformation {
    std::vector<int> externalRank; //!< MPI rank that each cell is being communicated to externally
