@@ -842,6 +842,11 @@ template <typename T, int stencil> class FsGrid {
         return rank;
       }
 
+      /*! Get in which directions, if any, this grid is periodic */
+      std::array<bool, 3>& getPeriodic() {
+        return periodic;
+      }
+
       /*! Perform an MPI_Allreduce with this grid's internal communicator
        * Function syntax is identical to MPI_Allreduce, except the final (communicator
        * argument will not be needed) */
