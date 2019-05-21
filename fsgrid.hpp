@@ -854,62 +854,7 @@ template <typename T, int stencil> class FsGrid {
          return MPI_Allreduce(sendbuf, recvbuf, count, datatype, op, comm3d);
       }
 
-   private:
-      //! MPI Cartesian communicator used in this grid
-      MPI_Comm comm3d;
-      int rank; //!< This task's rank in the communicator
-      std::vector<MPI_Request> requests;
-      uint numRequests;
-      FsGridCouplingInformation& coupling;
-
-      std::array<int, 27> neighbour; //!< Tasks of the 26 neighbours (plus ourselves)
-      std::vector<char> neighbour_index; //!< Lookup table from rank to index in the neighbour array
-
-      // We have, fundamentally, two different coordinate systems we're dealing with:
-      // 1) Task grid in the MPI_Cartcomm
-      std::array<int, 3> ntasks; //!< Number of tasks in each direction
-      std::array<int, 3> taskPosition; //!< This task's position in the 3d task grid
-      // 2) Cell numbers in global and local view
-
-      std::array<bool, 3> periodic; //!< Information about whether a given direction is periodic
-      std::array<int32_t, 3> globalSize; //!< Global size of the simulation space, in cells
-      std::array<int32_t, 3> localSize;  //!< Local size of simulation space handled by this task (without ghost cells)
-      std::array<int32_t, 3> storageSize;  //!< Local size of simulation space handled by this task (including ghost cells)
-      std::array<int32_t, 3> localStart; //!< Offset of the local
-                                          //!coordinate system against
-                                          //!the global one
-
-      std::array<MPI_Datatype, 27> neighbourSendType; //!< Datatype for sending data
-      std::array<MPI_Datatype, 27> neighbourReceiveType; //!< Datatype for receiving data
-
-
-
-      //! Actual storage of field data
-      std::vector<T> data;
-
-      //! Helper function: given a global cellID, calculate the global cell coordinate from it.
-      // This is then used do determine the task responsible for this cell, and the
-      // local cell index in it.
-      std::array<int, 3> globalIDtoCellCoord(GlobalID id) {
-
-         // Transform globalID to global cell coordinate
-         std::array<int, 3> cell;
-
-         assert(id >= 0);
-         assert(id < globalSize[0] * globalSize[1] * globalSize[2]);
-
-         int stride=1;
-         for(int i=0; i<3; i++) {
-            cell[i] = (id / stride) % globalSize[i];
-            stride *= globalSize[i];
-         }
-
-         return cell;
-      }
-
       //! Helper function to optimize decomposition of this grid over the given number of tasks
-
-
       void computeDomainDecomposition(const std::array<int, 3>& GlobalSize, int nProcs, std::array<int,3>& processDomainDecomposition) {
          std::array<double, 3> systemDim;
          std::array<double, 3 > processBox;
@@ -981,6 +926,60 @@ template <typename T, int stencil> class FsGrid {
          }
       }
    
+
+   private:
+      //! MPI Cartesian communicator used in this grid
+      MPI_Comm comm3d;
+      int rank; //!< This task's rank in the communicator
+      std::vector<MPI_Request> requests;
+      uint numRequests;
+      FsGridCouplingInformation& coupling;
+
+      std::array<int, 27> neighbour; //!< Tasks of the 26 neighbours (plus ourselves)
+      std::vector<char> neighbour_index; //!< Lookup table from rank to index in the neighbour array
+
+      // We have, fundamentally, two different coordinate systems we're dealing with:
+      // 1) Task grid in the MPI_Cartcomm
+      std::array<int, 3> ntasks; //!< Number of tasks in each direction
+      std::array<int, 3> taskPosition; //!< This task's position in the 3d task grid
+      // 2) Cell numbers in global and local view
+
+      std::array<bool, 3> periodic; //!< Information about whether a given direction is periodic
+      std::array<int32_t, 3> globalSize; //!< Global size of the simulation space, in cells
+      std::array<int32_t, 3> localSize;  //!< Local size of simulation space handled by this task (without ghost cells)
+      std::array<int32_t, 3> storageSize;  //!< Local size of simulation space handled by this task (including ghost cells)
+      std::array<int32_t, 3> localStart; //!< Offset of the local
+                                          //!coordinate system against
+                                          //!the global one
+
+      std::array<MPI_Datatype, 27> neighbourSendType; //!< Datatype for sending data
+      std::array<MPI_Datatype, 27> neighbourReceiveType; //!< Datatype for receiving data
+
+
+
+      //! Actual storage of field data
+      std::vector<T> data;
+
+      //! Helper function: given a global cellID, calculate the global cell coordinate from it.
+      // This is then used do determine the task responsible for this cell, and the
+      // local cell index in it.
+      std::array<int, 3> globalIDtoCellCoord(GlobalID id) {
+
+         // Transform globalID to global cell coordinate
+         std::array<int, 3> cell;
+
+         assert(id >= 0);
+         assert(id < globalSize[0] * globalSize[1] * globalSize[2]);
+
+         int stride=1;
+         for(int i=0; i<3; i++) {
+            cell[i] = (id / stride) % globalSize[i];
+            stride *= globalSize[i];
+         }
+
+         return cell;
+      }
+
       void swapArray(std::array<int, 3>& array) {
          int a = array[0];
          array[0] = array[2];
