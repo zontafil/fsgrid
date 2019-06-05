@@ -640,6 +640,12 @@ template <typename T, int stencil> class FsGrid {
          return localSize;
       }
 
+      /*! Get the sstart coordinates of the local domain handled by this grid.
+       */
+      std::array<int32_t, 3>& getLocalStart() {
+         return localStart;
+      }
+
       /*! Get global size of the fsgrid domain
        */
       std::array<int32_t, 3>& getGlobalSize() {
