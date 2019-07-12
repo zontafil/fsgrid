@@ -74,7 +74,7 @@ template <typename T, int stencil> class FsGrid {
          periodic = isPeriodic;
          //set temporary int array for MPI_Cart_create
          std::array<int, 3> isPeriodicInt;
-         for(int i=0; i < isPeriodic.size(); i++) {
+         for(unsigned int i=0; i < isPeriodic.size(); i++) {
             isPeriodicInt[i] = (int)isPeriodic[i];
          }  
          
@@ -939,7 +939,6 @@ template <typename T, int stencil> class FsGrid {
       int rank; //!< This task's rank in the communicator
       std::vector<MPI_Request> requests;
       uint numRequests;
-      FsGridCouplingInformation& coupling;
 
       std::array<int, 27> neighbour; //!< Tasks of the 26 neighbours (plus ourselves)
       std::vector<char> neighbour_index; //!< Lookup table from rank to index in the neighbour array
@@ -957,6 +956,8 @@ template <typename T, int stencil> class FsGrid {
       std::array<int32_t, 3> localStart; //!< Offset of the local
                                           //!coordinate system against
                                           //!the global one
+
+      FsGridCouplingInformation& coupling; // Information required to couple to external grids
 
       std::array<MPI_Datatype, 27> neighbourSendType; //!< Datatype for sending data
       std::array<MPI_Datatype, 27> neighbourReceiveType; //!< Datatype for receiving data
