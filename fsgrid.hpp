@@ -381,6 +381,26 @@ template <typename T, int stencil> class FsGrid {
          return retVal;
       }
 
+      /*! Transform global cell coordinates into the local domain.
+       * If the coordinates are out of bounds, (-1,-1,-1) is returned.
+       * \param x The cell's global x coordinate
+       * \param y The cell's global y coordinate
+       * \param z The cell's global z coordinate
+       */
+      std::array<int, 3> globalToLocal(int x, int y, int z) {
+         std::array<int, 3> retval;
+         retval[0] = x - localStart[0];
+         retval[1] = y - localStart[1];
+         retval[2] = z - localStart[2];
+
+         if(retval[0] > localSize[0] || retval[1] > localSize[1] || retval[2] > localSize[2]
+               || retval[0] < 0 || retval[1] < 0 || retval[2] < 0) {
+            return {-1,-1,-1};
+         }
+
+         return retval;
+      }
+
       /*! Determine the cell's GlobalID from its local x,y,z coordinates
        * \param x The cell's task-local x coordinate
        * \param y The cell's task-local y coordinate
