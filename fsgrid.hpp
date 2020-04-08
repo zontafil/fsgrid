@@ -923,16 +923,18 @@ template <typename T, int stencil> class FsGrid {
       }
 
       //! Copy the entire data from another FsGrid of the same signature over.
-      void copyDataFromOther(const FsGrid<T, stencil>& other) {
+      FsGrid<T, stencil>& operator=(const FsGrid<T, stencil>& other) {
 
          // Don't copy if sizes mismatch.
          // (Should this instead crash the program?)
          if(other.localSize[0] != localSize[0]   ||
             other.localSize[1] != localSize[1]   ||
             other.localSize[2] != localSize[2]) {
-            return;
+            return *this;
          }
          data = other.data;
+
+         return *this;
       }
    
       //! Helper function: calculate position of the local coordinate space for the given dimension
