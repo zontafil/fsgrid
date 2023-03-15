@@ -136,13 +136,16 @@ template <typename T, int stencil> class FsGrid : public FsGridTools{
       typedef int64_t LocalID;
       typedef int64_t GlobalID;
 
+   // Legacy constructor from coupling reference
+   FsGrid(std::array<int32_t,3> globalSize, MPI_Comm parent_comm, std::array<bool,3> isPeriodic, FsGridCouplingInformation& coupling) : FsGrid(globalSize, parent_comm, isPeriodic, &coupling) {}
+
       /*! Constructor for this grid.
        * \param globalSize Cell size of the global simulation domain.
        * \param MPI_Comm The MPI communicator this grid should use.
        * \param isPeriodic An array specifying, for each dimension, whether it is to be treated as periodic.
        */
-   FsGrid(std::array<int32_t,3> globalSize, MPI_Comm parent_comm, std::array<bool,3> isPeriodic, FsGridCouplingInformation& coupling)
-            : globalSize(globalSize),coupling(coupling) {
+   FsGrid(std::array<int32_t,3> globalSize, MPI_Comm parent_comm, std::array<bool,3> isPeriodic, FsGridCouplingInformation* coupling)
+            : globalSize(globalSize), coupling(coupling) {
          int status;
          int size;
 
@@ -281,7 +284,7 @@ template <typename T, int stencil> class FsGrid : public FsGridTools{
             totalStorageSize *= storageSize[i];
          }
          data.resize(totalStorageSize);
-         coupling.setCouplingSize(totalStorageSize);
+         coupling->setCouplingSize(totalStorageSize);
 
          MPI_Datatype mpiTypeT;
          MPI_Type_contiguous(sizeof(T), MPI_BYTE, &mpiTypeT);
@@ -524,8 +527,8 @@ template <typename T, int stencil> class FsGrid : public FsGridTools{
          numRequests=0;
 
          // If previous coupling information was present, remove it.
-         for(uint i=0; i<coupling.externalRank.size(); i++) {
-            coupling.externalRank[i] = MPI_PROC_NULL;
+         for(uint i=0; i<coupling->externalRank.size(); i++) {
+            coupling->externalRank[i] = MPI_PROC_NULL;
          }
 
          for(int z=0; z<localSize[2]; z++) {
@@ -534,8 +537,8 @@ template <typename T, int stencil> class FsGrid : public FsGridTools{
                   // Calculate LocalID for this cell
                   LocalID thisCell = LocalIDForCoords(x,y,z);
                   assert(numRequests < requests.size());
-                  assert(thisCell < coupling.externalRank.size());
-                  status = MPI_Irecv(&coupling.externalRank[thisCell], 1, MPI_INT, MPI_ANY_SOURCE, thisCell, comm3d,
+                  assert(thisCell < coupling->externalRank.size());
+                  status = MPI_Irecv(&coupling->externalRank[thisCell], 1, MPI_INT, MPI_ANY_SOURCE, thisCell, comm3d,
                         &requests[numRequests++]);
                   if(status != MPI_SUCCESS) {
                      std::cerr << "Error setting up MPI Irecv in FsGrid::setupForGridCoupling" << std::endl;
@@ -593,7 +596,7 @@ template <typename T, int stencil> class FsGrid : public FsGridTools{
                   // Calculate LocalID for this cell
                   LocalID thisCell = LocalIDForCoords(x,y,z);
                   assert(numRequests < requests.size());
-                  status = MPI_Irecv(get(thisCell), sizeof(T), MPI_BYTE, coupling.externalRank[thisCell],
+                  status = MPI_Irecv(get(thisCell), sizeof(T), MPI_BYTE, coupling->externalRank[thisCell],
                                      thisCell, comm3d, &requests[numRequests++]);
                   if(status != MPI_SUCCESS) {
                      std::cerr << "Error setting up MPI Irecv in FsGrid::setupForTransferIn" << std::endl;
@@ -677,7 +680,7 @@ template <typename T, int stencil> class FsGrid : public FsGridTools{
                   // Calculate LocalID for this cell
                   LocalID thisCell = LocalIDForCoords(x,y,z);
                   assert(numRequests < requests.size());
-                  status = MPI_Isend(get(thisCell), sizeof(T), MPI_BYTE, coupling.externalRank[thisCell], thisCell, comm3d,
+                  status = MPI_Isend(get(thisCell), sizeof(T), MPI_BYTE, coupling->externalRank[thisCell], thisCell, comm3d,
                         &requests[numRequests++]);
                   if(status != MPI_SUCCESS) {
                      std::cerr << "Error setting up MPI Isend in FsGrid::setupForTransferOut" << std::endl;
@@ -961,25 +964,6 @@ template <typename T, int stencil> class FsGrid : public FsGridTools{
          return MPI_Allreduce(sendbuf, recvbuf, count, datatype, op, comm3d);
       }
 
-
-      //! Copy the entire data from another FsGrid of the same signature over.
-      FsGrid<T, stencil>& operator=(const FsGrid<T, stencil>& other) {
-
-         // Don't copy if sizes mismatch.
-         // (Should this instead crash the program?)
-         if(other.localSize[0] != localSize[0]   ||
-            other.localSize[1] != localSize[1]   ||
-            other.localSize[2] != localSize[2]) {
-            return *this;
-         }
-         data = other.data;
-
-         return *this;
-      }
-   
-      
-   
-
    private:
       //! MPI Cartesian communicator used in this grid
       MPI_Comm comm3d;
@@ -1004,7 +988,7 @@ template <typename T, int stencil> class FsGrid : public FsGridTools{
                                           //!coordinate system against
                                           //!the global one
 
-      FsGridCouplingInformation& coupling; // Information required to couple to external grids
+      FsGridCouplingInformation* coupling; // Information required to couple to external grids
 
       std::array<MPI_Datatype, 27> neighbourSendType; //!< Datatype for sending data
       std::array<MPI_Datatype, 27> neighbourReceiveType; //!< Datatype for receiving data
