@@ -477,7 +477,7 @@ template <typename T, int stencil> class FsGrid : public FsGridTools{
          retval[1] = y - localStart[1];
          retval[2] = z - localStart[2];
 
-         if(retval[0] > localSize[0] || retval[1] > localSize[1] || retval[2] > localSize[2]
+         if(retval[0] >= localSize[0] || retval[1] >= localSize[1] || retval[2] >= localSize[2]
                || retval[0] < 0 || retval[1] < 0 || retval[2] < 0) {
             return {-1,-1,-1};
          }
