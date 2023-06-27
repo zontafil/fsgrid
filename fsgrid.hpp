@@ -403,36 +403,28 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
       }
 
 
-      class Proxy3 {
+      class Proxy {
          public:
-            __host__ __device__ Proxy3(int x, int y, int z, const FsGrid<T, TDim, stencil> &obj) : obj(obj), x(x), y(y), z(z)  {}
+            __host__ __device__ Proxy() : valid(false) {}
+            __host__ __device__ Proxy(int i, const FsGrid<T, TDim, stencil> &obj) : i(i), obj(&obj), valid(true) {}
 
             __host__ __device__ T& operator[](int j) {
-            return obj.get(x, y, z, j);
+               assert(valid);
+               return obj->getData(i + j);
             }
             __host__ __device__ T& at(int j) {
-            return obj.get(x, y, z, j);
+               assert(valid);
+               return obj->getData(i + j);
+            } 
+
+            __host__ __device__ bool isValid() {
+               return valid;
             } 
 
          private:
-            int x, y, z;
-            FsGrid<T, TDim, stencil> obj;
-         }; 
-
-         class Proxy1 {
-         public:
-            __host__ __device__ Proxy1(int i, const FsGrid<T, TDim, stencil> &obj) : i(i), obj(obj) {}
-
-            __host__ __device__ T& operator[](int j) {
-            return obj.get(i, j);
-            }
-            __host__ __device__ T& at(int j) {
-            return obj.get(i, j);
-            } 
-
-         private:
+            bool valid;
             int i;
-            FsGrid<T, TDim, stencil> obj;
+            const FsGrid<T, TDim, stencil>* obj;
          };  
 
       /*! Sets the data pointer to the given vector
@@ -440,13 +432,6 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
        */
       void setData(T *data) {
          this->data = data;
-      }
-
-      /*! Returns the data pointer
-       * \return pointer to the data vector
-       */
-      T *getData() {
-         return data;
       }
 
       /*! Finalize instead of destructor, as the MPI calls fail after the main program called MPI_Finalize().
@@ -837,7 +822,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
        * \param z z-Coordinate, in cells
        * \return A reference to cell data in the given cell
        */
-      __host__ __device__ T &get(int x, int y, int z, int offset) {
+      __host__ __device__ Proxy get(int x, int y, int z) {
 
          // Keep track which neighbour this cell actually belongs to (13 = ourself)
          int isInNeighbourDomain=13;
@@ -911,7 +896,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
          }
          if(!inside) {
             std::cerr << "Out-of bounds access in FsGrid::get! Expect weirdness." << std::endl;
-            return NULL;
+            return Proxy();
          }
 #endif // FSGRID_DEBUG
 
@@ -921,6 +906,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
             if(neighbour[isInNeighbourDomain]==MPI_PROC_NULL) {
                // Neighbour doesn't exist, we must be an outer boundary cell
                // (or something is quite wrong)
+               return Proxy();
             } else if(neighbour[isInNeighbourDomain] == rank) {
                // For periodic boundaries, where the neighbour is actually ourself,
                // return our own actual cell instead of the ghost
@@ -932,27 +918,24 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
          }
          LocalID index = LocalIDForCoords(x,y,z);
 
-         return data[index * TDim + offset];
+         return Proxy(index * TDim, *this);
       }
 
-      __host__ __device__ T &get(LocalID id, int offset) {
+      __host__ __device__ Proxy &get(LocalID id) {
          if(id < 0 || (unsigned int)id > globalSizeTotal) {
             #ifndef __CUDA_ARCH__ 
                std::cerr << "Out-of-bounds access in FsGrid::get!" << std::endl
                   << "(LocalID = " << id << ", but storage space is " << globalSizeTotal
                   << ". Expect weirdness." << std::endl;
             #endif
+            return Proxy();
          }
-         return data[id * TDim + offset];
+         return Proxy(id * TDim, *this);
       }
 
-      __host__ __device__ Proxy1 get(int i) const {
-            return Proxy1(i, *this);
+      __host__ __device__ T& getData(int i=0) const {
+            return data[i]; 
       }
-
-      __host__ __device__ Proxy3 get(int x, int y, int z) const {
-         return Proxy3(x, y, z, *this);
-      } 
 
       /*! Physical grid spacing and physical coordinate space start.
        * TODO: Should this be private and have accesor-functions?
