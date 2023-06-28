@@ -402,31 +402,6 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
 
       }
 
-
-      class Proxy {
-         public:
-            __host__ __device__ Proxy() : valid(false) {}
-            __host__ __device__ Proxy(int i, const FsGrid<T, TDim, stencil> &obj) : i(i), obj(&obj), valid(true) {}
-
-            __host__ __device__ T& operator[](int j) {
-               assert(valid);
-               return obj->getData(i + j);
-            }
-            __host__ __device__ T& at(int j) {
-               assert(valid);
-               return obj->getData(i + j);
-            } 
-
-            __host__ __device__ bool isValid() {
-               return valid;
-            } 
-
-         private:
-            bool valid;
-            int i;
-            const FsGrid<T, TDim, stencil>* obj;
-         };  
-
       /*! Sets the data pointer to the given vector
        * \param data pointer to the data vector
        */
@@ -822,7 +797,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
        * \param z z-Coordinate, in cells
        * \return A reference to cell data in the given cell
        */
-      __host__ __device__ Proxy get(int x, int y, int z) {
+      __host__ __device__ T* get(int x, int y, int z) {
 
          // Keep track which neighbour this cell actually belongs to (13 = ourself)
          int isInNeighbourDomain=13;
@@ -896,7 +871,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
          }
          if(!inside) {
             std::cerr << "Out-of bounds access in FsGrid::get! Expect weirdness." << std::endl;
-            return Proxy();
+            return NULL;
          }
 #endif // FSGRID_DEBUG
 
@@ -906,7 +881,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
             if(neighbour[isInNeighbourDomain]==MPI_PROC_NULL) {
                // Neighbour doesn't exist, we must be an outer boundary cell
                // (or something is quite wrong)
-               return Proxy();
+               return NULL;
             } else if(neighbour[isInNeighbourDomain] == rank) {
                // For periodic boundaries, where the neighbour is actually ourself,
                // return our own actual cell instead of the ghost
@@ -918,19 +893,23 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
          }
          LocalID index = LocalIDForCoords(x,y,z);
 
-         return Proxy(index * TDim, *this);
+         return &data[index * TDim];
       }
 
-      __host__ __device__ Proxy &get(LocalID id) {
+      __host__ __device__ T* get(LocalID id) {
          if(id < 0 || (unsigned int)id > globalSizeTotal) {
             #ifndef __CUDA_ARCH__ 
                std::cerr << "Out-of-bounds access in FsGrid::get!" << std::endl
                   << "(LocalID = " << id << ", but storage space is " << globalSizeTotal
                   << ". Expect weirdness." << std::endl;
             #endif
-            return Proxy();
+            return NULL;
          }
-         return Proxy(id * TDim, *this);
+         return &data[id * TDim];
+      }
+
+      __host__ __device__ T& get(int x, int y, int z, int i) {
+         return (get(x,y,z)[i]);
       }
 
       __host__ __device__ T& getData(int i=0) const {
