@@ -158,7 +158,6 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
             : globalSize{globalSize[0], globalSize[1], globalSize[2]}, coupling(coupling) {
          int status;
          int size;
-         globalSizeTotal = globalSize[0] * globalSize[1] * globalSize[2];
 
          status = MPI_Comm_size(parent_comm, &size);
 
@@ -903,10 +902,10 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
       }
 
       ARCH_HOSTDEV T* get(LocalID id) {
-         if(id < 0 || (unsigned int)id > globalSizeTotal) {
+         if(id < 0 || (unsigned int)id > totalStorageSize) {
             #ifndef __CUDA_ARCH__ 
                std::cerr << "Out-of-bounds access in FsGrid::get!" << std::endl
-                  << "(LocalID = " << id << ", but storage space is " << globalSizeTotal
+                  << "(LocalID = " << id << ", but storage space is " << totalStorageSize
                   << ". Expect weirdness." << std::endl;
             #endif
             return NULL;
@@ -1016,7 +1015,6 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
       std::array<bool, 3> periodic; //!< Information about whether a given direction is periodic
       int32_t totalStorageSize; //!< Total number of cells in the local storage, including ghost cells 
       int32_t globalSize[3]; //!< Global size of the simulation space, in cells
-      int32_t globalSizeTotal; //!< Total number of cells in the simulation space
       int32_t localSize[3];
       // std::array<int32_t, 3> localSize;  //!< Local size of simulation space handled by this task (without ghost cells)
       int32_t storageSize[3];  //!< Local size of simulation space handled by this task (including ghost cells)
