@@ -22,12 +22,18 @@
 #include <array>
 #include <vector>
 #include <mpi.h>
-#include "cuda.h"
-#include "cuda_runtime.h"
 #include <iostream>
 #include <limits>
 #include <stdint.h>
 #include <cassert>
+#ifdef __CUDACC__
+   #define ARCH_HOSTDEV __host__ __device__
+   #include "cuda.h"
+   #include "cuda_runtime.h"
+#else
+   #define ARCH_HOSTDEV 
+#endif 
+
 
 
 
@@ -511,7 +517,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
        * \param y The cell's task-local y coordinate
        * \param z The cell's task-local z coordinate
        */
-      __host__ __device__ LocalID LocalIDForCoords(int x, int y, int z) {
+      ARCH_HOSTDEV LocalID LocalIDForCoords(int x, int y, int z) {
          LocalID index=0;
          if(globalSize[2] > 1) {
             index += storageSize[0]*storageSize[1]*(stencil+z);
@@ -770,7 +776,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
 
       /*! Get global size of the fsgrid domain
        */
-      __host__ __device__ int* getGlobalSize() {
+      ARCH_HOSTDEV int* getGlobalSize() {
          return globalSize;
       }
 
@@ -797,7 +803,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
        * \param z z-Coordinate, in cells
        * \return A reference to cell data in the given cell
        */
-      __host__ __device__ T* get(int x, int y, int z) {
+      ARCH_HOSTDEV T* get(int x, int y, int z) {
 
          // Keep track which neighbour this cell actually belongs to (13 = ourself)
          int isInNeighbourDomain=13;
@@ -896,7 +902,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
          return &data[index * TDim];
       }
 
-      __host__ __device__ T* get(LocalID id) {
+      ARCH_HOSTDEV T* get(LocalID id) {
          if(id < 0 || (unsigned int)id > globalSizeTotal) {
             #ifndef __CUDA_ARCH__ 
                std::cerr << "Out-of-bounds access in FsGrid::get!" << std::endl
@@ -908,11 +914,11 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
          return &data[id * TDim];
       }
 
-      __host__ __device__ T& get(int x, int y, int z, int i) {
+      ARCH_HOSTDEV T& get(int x, int y, int z, int i) {
          return (get(x,y,z)[i]);
       }
 
-      __host__ __device__ T& getData(int i=0) const {
+      ARCH_HOSTDEV T& getData(int i=0) const {
             return data[i]; 
       }
 
