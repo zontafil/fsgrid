@@ -143,7 +143,6 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
 
       typedef int64_t LocalID;
       typedef int64_t GlobalID;
-      int diocane; 
       T* data;
 
    // Legacy constructor from coupling reference
@@ -769,7 +768,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
 
       /*! Get the sstart coordinates of the local domain handled by this grid.
        */
-      std::array<int32_t, 3>& getLocalStart() {
+      int32_t* getLocalStart() {
          return localStart;
       }
 
@@ -787,13 +786,10 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
        *
        * \return Global cell coordinates
        */
-      std::array<int32_t, 3> getGlobalIndices(int x, int y, int z) {
-         std::array<int32_t, 3> retval;
+      ARCH_HOSTDEV void getGlobalIndices(int x, int y, int z, int32_t (&retval)[3]) {
          retval[0] = localStart[0] + x;
          retval[1] = localStart[1] + y;
          retval[2] = localStart[2] + z;
-
-         return retval;
       }
 
       /*! Get a reference to the field data in a cell
@@ -1018,9 +1014,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
       int32_t localSize[3];
       // std::array<int32_t, 3> localSize;  //!< Local size of simulation space handled by this task (without ghost cells)
       int32_t storageSize[3];  //!< Local size of simulation space handled by this task (including ghost cells)
-      std::array<int32_t, 3> localStart; //!< Offset of the local
-                                          //!coordinate system against
-                                          //!the global one
+      int32_t localStart[3]; //!< Offset of the local coordinate system against the global one 
 
       FsGridCouplingInformation* coupling; // Information required to couple to external grids
 
