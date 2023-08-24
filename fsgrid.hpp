@@ -148,6 +148,9 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
    // Legacy constructor from coupling reference
    FsGrid(int32_t globalSize[3], MPI_Comm parent_comm, std::array<bool,3> isPeriodic, FsGridCouplingInformation& coupling) : FsGrid(globalSize, parent_comm, isPeriodic, &coupling) {}
 
+   // Legacy constructor from coupling reference
+   FsGrid(std::array<int32_t,3> globalSize, MPI_Comm parent_comm, std::array<bool,3> isPeriodic, FsGridCouplingInformation& coupling) : FsGrid(globalSize, parent_comm, isPeriodic, &coupling) {}
+
       /*! Constructor for this grid.
        * \param globalSize Cell size of the global simulation domain.
        * \param MPI_Comm The MPI communicator this grid should use.
@@ -292,7 +295,6 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
             }
             totalStorageSize *= storageSize[i];
          }
-         // data = new std::vector<T>(totalStorageSize);
          data = (T*) malloc(totalStorageSize * TDim * sizeof(T));
          coupling->setCouplingSize(totalStorageSize);
 
