@@ -296,6 +296,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
             totalStorageSize *= storageSize[i];
          }
          data = (T*) malloc(totalStorageSize * TDim * sizeof(T));
+         memset(data, 0, totalStorageSize * TDim * sizeof(T));
          coupling->setCouplingSize(totalStorageSize);
 
          MPI_Datatype mpiTypeT;
