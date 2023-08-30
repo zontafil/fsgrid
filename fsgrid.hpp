@@ -1,10 +1,10 @@
 #pragma once
 /*
   Copyright (C) 2016 Finnish Meteorological Institute
-  Copyright (C) 2016 CSC -IT Center for Science 
+  Copyright (C) 2016 CSC -IT Center for Science
 
   This file is part of fsgrid
- 
+
   fsgrid is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
@@ -31,8 +31,8 @@
    #include "cuda.h"
    #include "cuda_runtime.h"
 #else
-   #define ARCH_HOSTDEV 
-#endif 
+   #define ARCH_HOSTDEV
+#endif
 
 
 
@@ -90,8 +90,8 @@ struct FsGridTools{
                   if( i * j * k > nProcs )
                      break;
                   processBox[2] = std::max(systemDim[2]/k, 1.0);
-                  double value = 
-                     10 * processBox[0] * processBox[1] * processBox[2] + 
+                  double value =
+                     10 * processBox[0] * processBox[1] * processBox[2] +
                      (i > 1 ? processBox[1] * processBox[2]: 0) +
                      (j > 1 ? processBox[0] * processBox[2]: 0) +
                      (k > 1 ? processBox[0] * processBox[1]: 0);
@@ -165,15 +165,15 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
 
          // Heuristically choose a good domain decomposition for our field size
          computeDomainDecomposition(globalSize, size, ntasks);
-         
+
          //set private array
          periodic = isPeriodic;
          //set temporary int array for MPI_Cart_create
          std::array<int, 3> isPeriodicInt;
          for(unsigned int i=0; i < isPeriodic.size(); i++) {
             isPeriodicInt[i] = (int)isPeriodic[i];
-         }  
-         
+         }
+
          // Create cartesian communicator. Note, that reorder is false so
          // ranks match the ones in parent_comm
          status = MPI_Cart_create(parent_comm, 3, ntasks.data(), isPeriodicInt.data(), 0, &comm3d);
@@ -295,7 +295,11 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
             }
             totalStorageSize *= storageSize[i];
          }
+         #ifdef USE_GPU
+         cudaMallocManaged((void**)&data, totalStorageSize * TDim * sizeof(T));
+         #else
          data = (T*) malloc(totalStorageSize * TDim * sizeof(T));
+         #endif
          memset(data, 0, totalStorageSize * TDim * sizeof(T));
          coupling->setCouplingSize(totalStorageSize);
 
@@ -309,7 +313,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
                }
             }
          }
-         
+
          // Compute send and receive datatypes
 
          //loop through the shifts in the different directions
@@ -317,10 +321,10 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
             for(int y=-1; y<=1;y++) {
                for(int z=-1; z<=1; z++) {
                   int subarraySize[3];
-                  int subarrayStart[3];                  
+                  int subarrayStart[3];
                   const int shiftId = (x+1) * 9 + (y + 1) * 3 + (z + 1);
-                  
-                  
+
+
                   if((storageSize[0] == 1 && x!= 0 ) ||
                      (storageSize[1] == 1 && y!= 0 ) ||
                      (storageSize[2] == 1 && z!= 0 ) ||
@@ -347,15 +351,15 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
                      subarrayStart[2] = stencil;
                   else if (z == 1)
                      subarrayStart[2] = storageSize[2] - 2 * stencil;
-                  
+
                   for(int i = 0;i < 3; i++)
-                     if(storageSize[i] == 1) 
+                     if(storageSize[i] == 1)
                         subarrayStart[i] = 0;
 
                   int swappedStorageSize[3] = {storageSize[0], storageSize[1], storageSize[2]};
                   swapArray(swappedStorageSize);
                   swapArray(subarraySize);
-                  swapArray(subarrayStart);                  
+                  swapArray(subarrayStart);
                   MPI_Type_create_subarray(3,
                                            swappedStorageSize,
                                            subarraySize,
@@ -363,7 +367,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
                                            MPI_ORDER_C,
                                            mpiTypeT,
                                            &(neighbourSendType[shiftId]) );
-                  
+
                   if(x == 1 )
                      subarrayStart[0] = 0;
                   else if (x == 0)
@@ -383,10 +387,10 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
                   else if (z == -1)
                      subarrayStart[2] = storageSize[2] -  stencil;
                   for(int i = 0;i < 3; i++)
-                     if(storageSize[i] == 1) 
+                     if(storageSize[i] == 1)
                         subarrayStart[i] = 0;
-                  
-                  swapArray(subarrayStart);                  
+
+                  swapArray(subarrayStart);
                   MPI_Type_create_subarray(3,
                                            swappedStorageSize,
                                            subarraySize,
@@ -394,11 +398,11 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
                                            MPI_ORDER_C,
                                            mpiTypeT,
                                            &(neighbourReceiveType[shiftId]));
-                  
+
                }
             }
          }
-         
+
          for(int i=0;i<27;i++){
             if(neighbourReceiveType[i] != MPI_DATATYPE_NULL)
                MPI_Type_commit(&(neighbourReceiveType[i]));
@@ -481,7 +485,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
                stride *= thatTaskStorageSize[i];
             }
          }
-         
+
          return retVal;
       }
 
@@ -598,7 +602,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
          MPI_Barrier(comm3d);
       }
 
-      /*! Prepare for transfer of grid cell data into this grid. 
+      /*! Prepare for transfer of grid cell data into this grid.
        * Setup MPI Irecv requests to recieve data for each grid cell, and prepare
        * buffer space to hold the MPI requests of the sends.
        *
@@ -652,7 +656,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
          assert(numRequests == requests.size());
          MPI_Waitall(numRequests,requests.data(),MPI_STATUSES_IGNORE);
          numRequests = 0;
-         
+
       }
 
 
@@ -719,13 +723,13 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
          //TODO, faster with simultaneous isends& ireceives?
          std::array<MPI_Request, 27> receiveRequests;
          std::array<MPI_Request, 27> sendRequests;
-         
+
          for(int i = 0; i < 27; i++){
             receiveRequests[i] = MPI_REQUEST_NULL;
             sendRequests[i] = MPI_REQUEST_NULL;
          }
-         
-         
+
+
          for(int x=-1; x<=1;x++) {
             for(int y=-1; y<=1;y++) {
                for(int z=-1; z<=1; z++) {
@@ -739,7 +743,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
                }
             }
          }
-         
+
          for(int x=-1; x<=1;x++) {
             for(int y=-1; y<=1;y++) {
                for(int z=-1; z<=1; z++) {
@@ -753,25 +757,25 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
                }
             }
          }
-         MPI_Waitall(27, receiveRequests.data(), MPI_STATUSES_IGNORE);         
+         MPI_Waitall(27, receiveRequests.data(), MPI_STATUSES_IGNORE);
          MPI_Waitall(27, sendRequests.data(), MPI_STATUSES_IGNORE);
       }
-   
-   
+
+
       int32_t* getStorageSize() {
          return storageSize;
       }
 
       /*! Get the size of the local domain handled by this grid.
        */
-      int32_t* getLocalSize() {
+      ARCH_HOSTDEV int32_t* getLocalSize() {
       // std::array<int32_t, 3>& getLocalSize() {
          return localSize;
       }
 
       /*! Get the sstart coordinates of the local domain handled by this grid.
        */
-      int32_t* getLocalStart() {
+      ARCH_HOSTDEV int32_t* getLocalStart() {
          return localStart;
       }
 
@@ -842,7 +846,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
             }
          } else {
             if(x < -stencil || x >= localSize[0] + stencil) {
-               std::cerr << "x = " << x << " is outside of [ " << -stencil << 
+               std::cerr << "x = " << x << " is outside of [ " << -stencil <<
                   ", " << localSize[0] + stencil << "[!" << std::endl;
                inside = false;
             }
@@ -902,7 +906,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
 
       ARCH_HOSTDEV T* get(LocalID id) {
          if(id < 0 || (unsigned int)id > totalStorageSize) {
-            #ifndef __CUDA_ARCH__ 
+            #ifndef __CUDA_ARCH__
                std::cerr << "Out-of-bounds access in FsGrid::get!" << std::endl
                   << "(LocalID = " << id << ", but storage space is " << totalStorageSize
                   << ". Expect weirdness." << std::endl;
@@ -917,7 +921,7 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
       }
 
       ARCH_HOSTDEV T& getData(int i=0) const {
-            return data[i]; 
+            return data[i];
       }
 
       /*! Physical grid spacing and physical coordinate space start.
@@ -1012,12 +1016,12 @@ template <typename T, int TDim, int stencil> class FsGrid : public FsGridTools{
       // 2) Cell numbers in global and local view
 
       std::array<bool, 3> periodic; //!< Information about whether a given direction is periodic
-      int32_t totalStorageSize; //!< Total number of cells in the local storage, including ghost cells 
+      int32_t totalStorageSize; //!< Total number of cells in the local storage, including ghost cells
       int32_t globalSize[3]; //!< Global size of the simulation space, in cells
       int32_t localSize[3];
       // std::array<int32_t, 3> localSize;  //!< Local size of simulation space handled by this task (without ghost cells)
       int32_t storageSize[3];  //!< Local size of simulation space handled by this task (including ghost cells)
-      int32_t localStart[3]; //!< Offset of the local coordinate system against the global one 
+      int32_t localStart[3]; //!< Offset of the local coordinate system against the global one
 
       FsGridCouplingInformation* coupling; // Information required to couple to external grids
 
